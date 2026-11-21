@@ -5,31 +5,35 @@
 ## Highlights
 
 - **Modern Dark-Blue SaaS UI**: Crafted from scratch with deep obsidian-navy surfaces (`#040812` / `#070d19`), cobalt-to-cyan blue gradients (`#2563eb` -> `#0ea5e9`), responsive grids, and real-time Chart.js resource visualizations.
-- **Complete LXD Virtualization Backend**:
-  - Instant container provisioning (Ubuntu & Debian LTS images)
+- **GitHub Codespaces & Frontend Demo Mode (`demo.sh`)**:
+  - Run `bash demo.sh` in GitHub Codespaces or any local terminal without LXD or root privileges.
+  - Pre-seeds sample cluster nodes, virtual servers, port forwards, and an in-memory SFTP filesystem & interactive web shell so the entire frontend works out-of-the-box.
+- **Full Production LXD Backend (`install.sh` / `start.sh`)**:
+  - Real container provisioning (Ubuntu & Debian LTS images) via LXD
   - Live CPU, RAM, NVMe storage, and network bandwidth controls
   - Interactive Web Terminal (`Xterm.js` + Socket.IO) & one-click SSH provisioning
   - Integrated browser SFTP File Manager (browse, upload, download, rename, mkdir, delete)
-  - Point-in-time Snapshots, Full Container Backups, and Firewall Rules
   - Dynamic NAT TCP/UDP Port Forwarding with per-user port quotas
   - Server Expiration & Auto-Suspension lifecycle management
   - Multi-Node Cluster support (`node.py` remote agent) and REST API v1 (`api.py`)
 
-## Quick Start
+## 1. Run Interactive Frontend Demo (GitHub Codespaces)
 
 ```bash
-export MAIN_ADMIN_USERNAME="admin"
-export MAIN_ADMIN_PASSWORD="StrongPassword123!"
-export MAIN_ADMIN_EMAIL="admin@zk-vps.local"
-export PANEL_NAME="ZK-VPS-PANEL"
+bash demo.sh
+```
 
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-.venv/bin/python nrb.py
+- **Admin Login**: `admin` / `admin123`
+- **Client Login**: `demo` / `demo123`
+
+## 2. Real Production Installation (Ubuntu / Debian Host with LXD)
+
+```bash
+sudo bash install.sh --install
 ```
 
 ## Running Tests
 
 ```bash
-.venv/bin/pytest -q
+PYTHONPATH=. .venv/bin/pytest -q
 ```

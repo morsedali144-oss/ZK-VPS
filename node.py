@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""LXD node agent for LVM Panel remote compute nodes."""
+"""LXD node agent for ZK-VPS-PANEL remote compute nodes."""
 import asyncio
 import os
 import platform
@@ -61,7 +61,7 @@ def info():
     try:
         version = LXDRuntime._run_sync(['lxc', 'version'], timeout=10)
         LXDRuntime._run_sync(['lxc', 'info'], timeout=10)
-        return jsonify(success=True, version='LVM LXD Node 1.0', python_version=platform.python_version(), runtime='LXD', lxd_version=version)
+        return jsonify(success=True, version='ZK-VPS-PANEL LXD Node 2.0', python_version=platform.python_version(), runtime='LXD', lxd_version=version)
     except Exception:
         logger.exception('Node information request failed')
         return jsonify(success=False, error='Node information unavailable', runtime='LXD'), 503

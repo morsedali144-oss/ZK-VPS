@@ -1437,7 +1437,7 @@
                 <div class="header-right">
                     <div class="cluster-pill">
                         <span class="cluster-pill-dot"></span>
-                        <span>LXD Compute Engine</span>
+                        <span>{% if DEMO_MODE %}Demo Mode · Frontend Sandbox{% else %}LXD Compute Engine{% endif %}</span>
                     </div>
 
                     {% if current_user.is_authenticated %}

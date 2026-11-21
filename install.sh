@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# LVM Panel one-command installer and management menu.
+# ZK-VPS-PANEL one-command installer and management menu.
 set -Eeuo pipefail
-APP_DIR="/opt/lvm-panel"
-REPO="https://github.com/atifqmi-max/lvm-panel"
+APP_DIR="/opt/zk-vps-panel"
+REPO="https://github.com/morsedali144-oss/ZK-VPS"
 BRANCH="main"
-SERVICE="lvm-panel"
+SERVICE="zk-vps-panel"
 REQUESTED_PORT="${PORT:-}"
 PORT="${REQUESTED_PORT}"
-if [[ -z "$PORT" && -r /etc/lvm-panel.env ]]; then
-  PORT="$(sed -n 's/^PORT=//p' /etc/lvm-panel.env | head -n1)"
+if [[ -z "$PORT" && -r /etc/zk-vps-panel.env ]]; then
+  PORT="$(sed -n 's/^PORT=//p' /etc/zk-vps-panel.env | head -n1)"
 fi
 PORT="${PORT:-5000}"
 if ! [[ "$PORT" =~ ^[0-9]+$ ]] || (( PORT < 1 || PORT > 65535 )); then
@@ -50,10 +50,10 @@ bootstrap_source() {
   fi
   local tmp archive_url
   tmp="$(mktemp -d)"
-  archive_url="https://codeload.github.com/atifqmi-max/lvm-panel/zip/refs/heads/${BRANCH}"
+  archive_url="https://codeload.github.com/morsedali144-oss/ZK-VPS/zip/refs/heads/${BRANCH}"
   echo "[1/3] Preparing temporary download directory..." >&2
   mkdir -p "$tmp/source" "$tmp/unpacked"
-  echo "[2/3] Downloading LVM Panel source from GitHub (this may take a minute)..." >&2
+  echo "[2/3] Downloading ZK-VPS-PANEL source from GitHub (this may take a minute)..." >&2
   if ! curl -fL --retry 2 --connect-timeout 15 --max-time 180 --progress-bar "$archive_url" -o "$tmp/source.zip"; then
     echo "ERROR: GitHub source download failed or timed out." >&2
     echo "Check VPS DNS/network access to codeload.github.com and try again." >&2
@@ -97,9 +97,9 @@ wait_for_health() {
 
 install_panel() {
   echo
-  echo "== Install / initialize LVM Panel =="
-  if [[ -f "$APP_DIR/nrb.py" && -f /etc/lvm-panel.env ]]; then
-    echo "LVM Panel is already installed. Use menu option 8 to update or option 9 to repair it."
+  echo "== Install / initialize ZK-VPS-PANEL =="
+  if [[ -f "$APP_DIR/nrb.py" && -f /etc/zk-vps-panel.env ]]; then
+    echo "ZK-VPS-PANEL is already installed. Use menu option 8 to update or option 9 to repair it."
     return 0
   fi
   local source
@@ -135,16 +135,16 @@ install_panel() {
   venv/bin/python -m pip install --upgrade pip
   venv/bin/python -m pip install -r requirements.txt
   python3 -m py_compile nrb.py api.py node.py lxd_backend.py security_utils.py
-  chmod +x start.sh nrb-tool.sh install.sh
+  chmod +x start.sh zk-tool.sh install.sh
 
-  if [[ ! -f /etc/lvm-panel.env ]]; then
+  if [[ ! -f /etc/zk-vps-panel.env ]]; then
     local secret adminpass
     secret="$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')"
     adminpass="$(python3 -c 'import secrets; print(secrets.token_urlsafe(15))')"
-    cat > /etc/lvm-panel.env <<EOF
-PANEL_NAME=LVM Panel
+    cat > /etc/zk-vps-panel.env <<EOF
+PANEL_NAME=ZK-VPS-PANEL
 PANEL_VERSION=1.1
-PANEL_DEVELOPER=LVM Panel
+PANEL_DEVELOPER=ZK-VPS-PANEL
 SECRET_KEY=${secret}
 DATABASE_PATH=${APP_DIR}/nrb.db
 HOST=0.0.0.0
@@ -154,30 +154,30 @@ MAIN_ADMIN_PASSWORD=${adminpass}
 MAIN_ADMIN_EMAIL=admin@localhost
 DEBUG_MODE=False
 TRUST_PROXY_HEADERS=False
-LVM_ALLOW_PRIVILEGED_CONTAINERS=False
+ZK_ALLOW_PRIVILEGED_CONTAINERS=False
 SESSION_COOKIE_SECURE=False
 EOF
-    chmod 600 /etc/lvm-panel.env
-    printf '%s\n' "Initial admin credentials (save them now):" "Username: admin" "Password: $adminpass" | tee /root/lvm-panel-credentials.txt
-    chmod 600 /root/lvm-panel-credentials.txt
+    chmod 600 /etc/zk-vps-panel.env
+    printf '%s\n' "Initial admin credentials (save them now):" "Username: admin" "Password: $adminpass" | tee /root/zk-vps-panel-credentials.txt
+    chmod 600 /root/zk-vps-panel-credentials.txt
   elif [[ -n "$REQUESTED_PORT" ]]; then
-    if grep -q '^PORT=' /etc/lvm-panel.env; then
-      sed -i "s/^PORT=.*/PORT=${PORT}/" /etc/lvm-panel.env
+    if grep -q '^PORT=' /etc/zk-vps-panel.env; then
+      sed -i "s/^PORT=.*/PORT=${PORT}/" /etc/zk-vps-panel.env
     else
-      printf '\nPORT=${PORT}\n' >> /etc/lvm-panel.env
+      printf '\nPORT=${PORT}\n' >> /etc/zk-vps-panel.env
     fi
   fi
 
   cat > "/etc/systemd/system/${SERVICE}.service" <<EOF
 [Unit]
-Description=LVM Panel Web Application
+Description=ZK-VPS-PANEL Web Application
 After=network-online.target snap.lxd.daemon.service
 Wants=network-online.target
 
 [Service]
 Type=simple
 WorkingDirectory=${APP_DIR}
-EnvironmentFile=/etc/lvm-panel.env
+EnvironmentFile=/etc/zk-vps-panel.env
 ExecStart=${APP_DIR}/venv/bin/python ${APP_DIR}/nrb.py
 Restart=on-failure
 RestartSec=5
@@ -198,7 +198,7 @@ EOF
   echo
   echo "Installation complete. Health check passed."
   echo "Panel: http://YOUR_SERVER_IP:${PORT}"
-  echo "Credentials saved in: /root/lvm-panel-credentials.txt"
+  echo "Credentials saved in: /root/zk-vps-panel-credentials.txt"
   echo "Security: use HTTPS behind a trusted reverse proxy before exposing login traffic publicly."
   echo "Node agent defaults to localhost; configure NODE_BIND_HOST and firewall rules for remote nodes."
   echo "Service: systemctl status ${SERVICE}"
@@ -212,7 +212,7 @@ start_panel() {
     return 1
   fi
 }
-stop_panel() { systemctl stop "$SERVICE"; echo "LVM Panel stopped."; }
+stop_panel() { systemctl stop "$SERVICE"; echo "ZK-VPS-PANEL stopped."; }
 restart_panel() {
   systemctl restart "$SERVICE"
   if wait_for_health; then systemctl --no-pager --full status "$SERVICE"; else
@@ -257,7 +257,7 @@ update_panel() {
   local tmp backup_dir stamp update_ok=1 was_active=0 db_path=""
   tmp="$(mktemp -d)"
   stamp="$(date +%Y%m%d-%H%M%S)"
-  backup_dir="/var/backups/lvm-panel"
+  backup_dir="/var/backups/zk-vps-panel"
   mkdir -p "$backup_dir"
   chmod 700 "$backup_dir"
   if ! command -v rsync >/dev/null 2>&1; then
@@ -269,7 +269,7 @@ update_panel() {
   else
     rm -rf "$tmp/source"
     mkdir -p "$tmp/source"
-    if ! curl -fL --retry 3 "https://codeload.github.com/atifqmi-max/lvm-panel/zip/refs/heads/${BRANCH}" -o "$tmp/source.zip"; then
+    if ! curl -fL --retry 3 "https://codeload.github.com/morsedali144-oss/ZK-VPS/zip/refs/heads/${BRANCH}" -o "$tmp/source.zip"; then
       rm -rf "$tmp"
       echo "Could not download the update; the running application was not changed." >&2
       return 1
@@ -289,7 +289,7 @@ update_panel() {
     cp -a "$top/." "$tmp/source/"
   fi
 
-  for f in nrb.py api.py node.py lxd_backend.py security_utils.py requirements.txt install.sh start.sh nrb-tool.sh; do
+  for f in nrb.py api.py node.py lxd_backend.py security_utils.py requirements.txt install.sh start.sh zk-tool.sh; do
     if [[ ! -f "$tmp/source/$f" ]]; then
       rm -rf "$tmp"
       echo "Update is incomplete: required file $f is missing." >&2
@@ -320,7 +320,7 @@ update_panel() {
     return 1
   fi
 
-  db_path="$(sed -n 's/^DATABASE_PATH=//p' /etc/lvm-panel.env 2>/dev/null | head -n1)"
+  db_path="$(sed -n 's/^DATABASE_PATH=//p' /etc/zk-vps-panel.env 2>/dev/null | head -n1)"
   db_path="${db_path:-$APP_DIR/nrb.db}"
   if [[ "$db_path" != /* ]]; then db_path="$APP_DIR/$db_path"; fi
   if [[ -f "$db_path" && "$db_path" != "$APP_DIR/nrb.db" ]]; then
@@ -344,13 +344,13 @@ PY
     printf '%s\\n' "$db_path" > "$tmp/backup/external-db-path.txt"
   fi
 
-  if ! tar -czf "$backup_dir/lvm-panel-$stamp.tar.gz" -C "$tmp/backup" .; then
+  if ! tar -czf "$backup_dir/zk-vps-panel-$stamp.tar.gz" -C "$tmp/backup" .; then
     [[ "$was_active" -eq 1 ]] && systemctl start "$SERVICE" || true
     rm -rf "$tmp"
     echo "Could not save rollback archive; update cancelled." >&2
     return 1
   fi
-  chmod 600 "$backup_dir/lvm-panel-$stamp.tar.gz"
+  chmod 600 "$backup_dir/zk-vps-panel-$stamp.tar.gz"
 
   if ! rsync -a --delete --exclude='/venv/' --exclude='/nrb.db' --exclude='/nrb.log' --exclude='/static/uploads/' --exclude='/__pycache__/' "$tmp/source/" "$APP_DIR/"; then
     update_ok=0
@@ -368,7 +368,7 @@ PY
     echo "Update verification failed; restoring the previous application files." >&2
     systemctl stop "$SERVICE" >/dev/null 2>&1 || true
     if ! rsync -a --delete --exclude='/venv/' --exclude='/nrb.log' --exclude='/__pycache__/' "$tmp/backup/" "$APP_DIR/"; then
-      echo "CRITICAL: automatic source rollback failed. Restore $backup_dir/lvm-panel-$stamp.tar.gz manually." >&2
+      echo "CRITICAL: automatic source rollback failed. Restore $backup_dir/zk-vps-panel-$stamp.tar.gz manually." >&2
       rm -rf "$tmp"
       return 1
     fi
@@ -403,13 +403,13 @@ PY
       return 1
     fi
     rm -rf "$tmp"
-    echo "Previous application restored and health check passed. Rollback archive: $backup_dir/lvm-panel-$stamp.tar.gz"
+    echo "Previous application restored and health check passed. Rollback archive: $backup_dir/zk-vps-panel-$stamp.tar.gz"
     return 1
   fi
 
   rm -rf "$tmp"
   echo "Update complete; health check passed."
-  echo "Rollback archive: $backup_dir/lvm-panel-$stamp.tar.gz"
+  echo "Rollback archive: $backup_dir/zk-vps-panel-$stamp.tar.gz"
   echo "Service: systemctl status $SERVICE"
 }
 
@@ -448,13 +448,13 @@ uninstall_panel() {
 
   local stamp backup_dir db_path
   stamp="$(date +%Y%m%d-%H%M%S)"
-  backup_dir="/var/backups/lvm-panel/uninstall-$stamp"
+  backup_dir="/var/backups/zk-vps-panel/uninstall-$stamp"
   mkdir -p "$backup_dir"
   chmod 700 "$backup_dir"
 
-  if [[ -f /etc/lvm-panel.env ]]; then
-    cp -a /etc/lvm-panel.env "$backup_dir/lvm-panel.env"
-    db_path="$(sed -n 's/^DATABASE_PATH=//p' /etc/lvm-panel.env | head -n1)"
+  if [[ -f /etc/zk-vps-panel.env ]]; then
+    cp -a /etc/zk-vps-panel.env "$backup_dir/zk-vps-panel.env"
+    db_path="$(sed -n 's/^DATABASE_PATH=//p' /etc/zk-vps-panel.env | head -n1)"
   else
     db_path=""
   fi
@@ -473,7 +473,7 @@ uninstall_panel() {
   rm -f "/etc/systemd/system/${SERVICE}.service"
   systemctl daemon-reload
   rm -rf "$APP_DIR"
-  rm -f /etc/lvm-panel.env
+  rm -f /etc/zk-vps-panel.env
   echo "Panel removed. LXD was left installed because it may contain VPS instances."
   echo "Backup archive: $backup_dir.tar.gz"
 }
@@ -484,12 +484,12 @@ menu() {
     printf '\033[1;35m'
     cat <<'BANNER'
 ╔══════════════════════════════════════════════════════════════╗
-║                         LVM PANEL                            ║
+║                         ZK-VPS-PANEL                            ║
 ║                 VPS Management • LXD Runtime                 ║
 ╚══════════════════════════════════════════════════════════════╝
 BANNER
     printf '\033[0m'
-    echo "  1) Install / Initialize LVM Panel"
+    echo "  1) Install / Initialize ZK-VPS-PANEL"
     echo "  2) Start panel service"
     echo "  3) Stop panel service"
     echo "  4) Restart panel service"

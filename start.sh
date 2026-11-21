@@ -30,7 +30,7 @@ if ! lxc info >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "LXD is ready. Starting LVM Panel on port 5000..."
+echo "LXD is ready. Starting ZK-VPS-PANEL on port 5000..."
 if [ ! -d venv ]; then python3 -m venv venv; fi
 source venv/bin/activate
 python3 -m pip install -r requirements.txt

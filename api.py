@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-NRB Panel - Comprehensive REST API
-Full management API for NRB Panel
+ZK-VPS-PANEL - Comprehensive REST API
+Full management API for ZK-VPS-PANEL
 """
 
 from flask import Blueprint, request, jsonify
@@ -104,9 +104,9 @@ def api_info():
     return jsonify({
         'success': True,
         'api': {
-            'name': 'NRB Panel API',
+            'name': 'ZK-VPS-PANEL API',
             'version': 'v1',
-            'description': 'Comprehensive REST API for NRB Panel management',
+            'description': 'Comprehensive REST API for ZK-VPS-PANEL management',
             'documentation': '/api/v1/docs',
             'endpoints': {
                 'authentication': '/api/v1/auth/*',

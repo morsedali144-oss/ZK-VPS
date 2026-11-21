@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""LXD runtime adapter for LVM Panel VPS instances."""
+"""LXD runtime adapter for ZK-VPS-PANEL VPS instances."""
 import asyncio
 import json
 import os
@@ -71,7 +71,7 @@ class LXDRuntime:
         cls._run_sync(["lxc", "init", cls._image(image), name], timeout=600)
         try:
             # Privileged containers weaken isolation and are opt-in for compatibility cases.
-            if os.getenv('LVM_ALLOW_PRIVILEGED_CONTAINERS', 'false').lower() == 'true':
+            if os.getenv('ZK_ALLOW_PRIVILEGED_CONTAINERS', 'false').lower() == 'true':
                 cls._run_sync(["lxc", "config", "set", name, "security.privileged", "true"])
             cls._run_sync(["lxc", "config", "set", name, "security.nesting", "true"])
             if os.path.exists("/dev/net/tun"):
@@ -97,7 +97,7 @@ class LXDRuntime:
     @classmethod
     async def update(cls, name, privileged=False, ram_mb=None, cpu=None):
         def work():
-            if privileged and os.getenv('LVM_ALLOW_PRIVILEGED_CONTAINERS', 'false').lower() == 'true':
+            if privileged and os.getenv('ZK_ALLOW_PRIVILEGED_CONTAINERS', 'false').lower() == 'true':
                 cls._run_sync(["lxc", "config", "set", name, "security.privileged", "true"])
                 cls._run_sync(["lxc", "config", "set", name, "security.nesting", "true"])
             if ram_mb:
@@ -115,7 +115,7 @@ class LXDRuntime:
         proto, host_port = host.group(1), int(host.group(2))
         vps_port = int(target.group(1))
         ip = cls._container_ip(name)
-        pidfile = Path("/run") / f"lvm-socat-{name}-{proto}-{host_port}.pid"
+        pidfile = Path("/run") / f"zk-socat-{name}-{proto}-{host_port}.pid"
         if pidfile.exists():
             try:
                 os.kill(int(pidfile.read_text().strip()), 15)
@@ -134,7 +134,7 @@ class LXDRuntime:
         if not match:
             return True
         proto, port = match.group(1), match.group(2)
-        pidfile = Path("/run") / f"lvm-socat-{name}-{proto}-{port}.pid"
+        pidfile = Path("/run") / f"zk-socat-{name}-{proto}-{port}.pid"
         if pidfile.exists():
             try:
                 os.kill(int(pidfile.read_text().strip()), 15)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# nrb.py - LVM Panel - LXD-based VPS management
+# nrb.py - ZK-VPS-PANEL - LXD-based VPS management
 # Version: 5.0-PRO-ULTIMATE - FIXED
 
 import os
@@ -126,6 +126,7 @@ MAIN_ADMIN_EMAIL = os.getenv('MAIN_ADMIN_EMAIL', 'admin@localhost')
 YOUR_SERVER_IP = os.getenv('YOUR_SERVER_IP', socket.gethostbyname(socket.gethostname()))
 DEFAULT_STORAGE_POOL = os.getenv('DEFAULT_STORAGE_POOL', 'default')
 DEBUG_MODE = os.getenv('DEBUG_MODE', 'False').lower() == 'true'
+DEMO_MODE = os.getenv('DEMO_MODE', 'False').lower() in {'1', 'true', 'yes'}
 AUTO_BACKUP_INTERVAL = int(os.getenv('AUTO_BACKUP_INTERVAL', 3600))
 STATS_UPDATE_INTERVAL = int(os.getenv('STATS_UPDATE_INTERVAL', 5))
 
@@ -160,7 +161,7 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
-logger = logging.getLogger('nrb_panel')
+logger = logging.getLogger('zk_vps_panel')
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -1058,6 +1059,48 @@ echo "NRB_SSH_READY"
 
 async def execute_container(container_name: str, command: str, timeout=120, node_id: Optional[int] = None):
     """Execute a VPS operation through the local or remote LXD runtime."""
+    if DEMO_MODE:
+        cmd = (command or "").strip()
+        if cmd.startswith("info "):
+            status_val = "running"
+            try:
+                with get_db() as conn:
+                    cur = conn.cursor()
+                    cur.execute("SELECT status FROM vps WHERE container_name = ?", (container_name,))
+                    row = cur.fetchone()
+                    if row and row["status"]:
+                        status_val = row["status"]
+            except Exception:
+                pass
+            return f"Name: {container_name}\nStatus: {status_val.upper()}\n"
+        if cmd.startswith("start ") or cmd.startswith("restart "):
+            try:
+                with get_db() as conn:
+                    conn.execute("UPDATE vps SET status = 'running', updated_at = ? WHERE container_name = ?",
+                                 (datetime.now().isoformat(), container_name))
+            except Exception:
+                pass
+            return "Started (Demo Mode)"
+        if cmd.startswith("stop "):
+            try:
+                with get_db() as conn:
+                    conn.execute("UPDATE vps SET status = 'stopped', updated_at = ? WHERE container_name = ?",
+                                 (datetime.now().isoformat(), container_name))
+            except Exception:
+                pass
+            return "Stopped (Demo Mode)"
+        if cmd.startswith("init "):
+            return str(22000 + (abs(hash(container_name)) % 800))
+        if cmd.startswith("list "):
+            return "10.108.14.21 (eth0)"
+        if "tmate" in cmd and "tmate_ssh" in cmd:
+            return f"ssh demo-{container_name}@lon1.tmate.io"
+        if "tmate" in cmd and "tmate_web" in cmd:
+            return f"https://tmate.io/t/demo-{container_name}"
+        if "NRB_SSH_READY" in cmd:
+            return "NRB_SSH_READY"
+        return f"[Demo Mode] Executed on {container_name}: {cmd}"
+
     if node_id is None and container_name:
         node_id = find_node_id_for_container(container_name)
     node = get_node(node_id) if node_id is not None else None
@@ -1244,6 +1287,8 @@ fi
 
 async def apply_lxd_config(container_name: str, node_id: int):
     """Apply LXD container settings required by the panel."""
+    if DEMO_MODE:
+        return True
     try:
         await LXDRuntime.update(container_name, privileged=True)
         logger.info(f"LXD runtime settings applied to {container_name}")
@@ -1563,7 +1608,8 @@ def utility_processor():
         PANEL_NAME=PANEL_NAME,
         PANEL_DEVELOPER=PANEL_DEVELOPER,
         YOUR_SERVER_IP=YOUR_SERVER_IP,
-        socketio_available=SOCKETIO_AVAILABLE
+        socketio_available=SOCKETIO_AVAILABLE,
+        DEMO_MODE=DEMO_MODE
     )
 
 def is_vps_suspended(vps):
@@ -2224,6 +2270,18 @@ async def get_node_status(node_id: int) -> Dict:
     if not node:
         logger.warning(f"Node {node_id} not found for status check")
         return {"status": "❓ Unknown", "online": False}
+    if DEMO_MODE:
+        return {
+            "status": "🟢 Online (Demo)",
+            "online": True,
+            "local": bool(node.get("is_local")),
+            "last_seen": datetime.now().isoformat(),
+            "stats": {
+                "cpu": 18.4,
+                "ram": {"used": 6144, "total": 32768, "pct": 18.7},
+                "disk": {"used": "140G", "total": "1000G", "pct": 14.0}
+            }
+        }
     
     if node['is_local']:
         try:
@@ -2336,6 +2394,32 @@ async def get_container_status(container_name: str, node_id: Optional[int] = Non
 
 async def get_container_stats(container_name: str, node_id: Optional[int] = None) -> Dict:
     """Get container statistics with improved error handling and data transformation"""
+    if DEMO_MODE:
+        status_val = await get_container_status(container_name, node_id)
+        if status_val == "running":
+            seed = abs(hash(container_name))
+            cpu_pct = round(11.5 + (seed % 26) + (datetime.now().second % 7) * 0.4, 1)
+            ram_pct = round(24.0 + (seed % 32), 1)
+            disk_pct = round(18.0 + (seed % 25), 1)
+            return {
+                "status": "running",
+                "cpu": cpu_pct,
+                "ram": {"used": int(4096 * ram_pct / 100), "total": 4096, "pct": ram_pct},
+                "disk": {"size": "80G", "used": f"{int(80 * disk_pct / 100)}G", "available": f"{80 - int(80 * disk_pct / 100)}G", "use_percent": f"{int(disk_pct)}%", "pct": disk_pct},
+                "uptime": "14d 6h 42m",
+                "processes": 36 + (seed % 24),
+                "network": {"eth0": {"rx_bytes": 248512000, "tx_bytes": 114280000}}
+            }
+        return {
+            "status": status_val,
+            "cpu": 0.0,
+            "ram": {"used": 0, "total": 4096, "pct": 0.0},
+            "disk": {"use_percent": "0%", "pct": 0.0},
+            "uptime": "Stopped",
+            "processes": 0,
+            "network": {}
+        }
+
     if node_id is None:
         node_id = find_node_id_for_container(container_name)
     
@@ -2945,7 +3029,7 @@ def register():
             conn.commit()
         
         log_activity(user_id, 'register', 'auth', None, {'username': username, 'email': email})
-        create_notification(user_id, 'success', 'Welcome!', f'Welcome to {get_setting("site_name", "LVM Panel")}! Your account has been created.')
+        create_notification(user_id, 'success', 'Welcome!', f'Welcome to {get_setting("site_name", "ZK-VPS-PANEL")}! Your account has been created.')
         flash('Registration successful! Please log in.', 'success')
         return redirect(url_for('login'))
     
@@ -3239,8 +3323,8 @@ def discord_auto_register(discord_id, discord_username, discord_email, discord_a
             login_user(user, remember=True)
             
             log_activity(user.id, 'register_discord', 'auth', str(user.id))
-            create_notification(user.id, 'success', 'Welcome!', f'Welcome to {get_setting("site_name", "NRB Panel")}, {username}! Your account has been created.')
-            flash(f'Welcome to {get_setting("site_name", "NRB Panel")}, {username}! Your account has been created.', 'success')
+            create_notification(user.id, 'success', 'Welcome!', f'Welcome to {get_setting("site_name", "ZK-VPS-PANEL")}, {username}! Your account has been created.')
+            flash(f'Welcome to {get_setting("site_name", "ZK-VPS-PANEL")}, {username}! Your account has been created.', 'success')
             return redirect(url_for('dashboard'))
             
     except Exception as e:
@@ -4158,8 +4242,124 @@ def configure_vps_ssh_host_key(ssh_client, vps, hostname, port):
     ssh_client.set_missing_host_key_policy(paramiko.RejectPolicy())
 
 
+_DEMO_FS = {}
+
+
+class _DemoSFTPAttr:
+    def __init__(self, filename, is_dir=False, size=1024, mtime=None):
+        import stat
+        self.filename = filename
+        self.st_mode = (stat.S_IFDIR | 0o755) if is_dir else (stat.S_IFREG | 0o644)
+        self.st_size = 0 if is_dir else size
+        self.st_mtime = mtime or int(datetime.now().timestamp())
+        self.st_uid = 0
+        self.st_gid = 0
+
+
+class _DemoSSHClient:
+    def close(self):
+        pass
+
+
+class _DemoSFTPClient:
+    def __init__(self, container_name):
+        self.container_name = container_name
+        if container_name not in _DEMO_FS:
+            _DEMO_FS[container_name] = {
+                "/": {"type": "dir"},
+                "/root": {"type": "dir"},
+                "/root/app": {"type": "dir"},
+                "/root/configs": {"type": "dir"},
+                "/root/docker-compose.yml": {"type": "file", "content": b"version: '3.9'\nservices:\n  web:\n    image: nginx:alpine\n    ports:\n      - '8080:80'\n"},
+                "/root/deploy.sh": {"type": "file", "content": b"#!/usr/bin/env bash\necho 'Deploying application on ZK-VPS-PANEL...'\n"},
+                "/root/.bashrc": {"type": "file", "content": b"export PS1='root@zk-vps:\\w# '\n"},
+                "/root/README.md": {"type": "file", "content": b"# ZK-VPS-PANEL Demo Instance\nManaged via ZK-VPS-PANEL SFTP Explorer.\n"},
+                "/etc": {"type": "dir"},
+                "/etc/hostname": {"type": "file", "content": f"{container_name}\n".encode("utf-8")},
+            }
+        self.fs = _DEMO_FS[container_name]
+
+    def _norm(self, path):
+        p = "/" + "/".join(part for part in (path or "/").split("/") if part)
+        return p
+
+    def listdir_attr(self, path):
+        p = self._norm(path)
+        if p not in self.fs:
+            self.fs[p] = {"type": "dir"}
+        prefix = "/" if p == "/" else p + "/"
+        out = []
+        for k, meta in list(self.fs.items()):
+            if k == p or not k.startswith(prefix):
+                continue
+            rest = k[len(prefix):]
+            if "/" not in rest and rest:
+                is_dir = meta.get("type") == "dir"
+                content = meta.get("content", b"")
+                out.append(_DemoSFTPAttr(rest, is_dir=is_dir, size=len(content)))
+        return out
+
+    def mkdir(self, path, mode=0o755):
+        self.fs[self._norm(path)] = {"type": "dir"}
+
+    def rmdir(self, path):
+        p = self._norm(path)
+        for k in list(self.fs.keys()):
+            if k == p or k.startswith(p + "/"):
+                self.fs.pop(k, None)
+
+    def remove(self, path):
+        self.fs.pop(self._norm(path), None)
+
+    def rename(self, oldpath, newpath):
+        old_p = self._norm(oldpath)
+        new_p = self._norm(newpath)
+        if old_p in self.fs:
+            self.fs[new_p] = self.fs.pop(old_p)
+
+    def put(self, localpath, remotepath):
+        with open(localpath, "rb") as f:
+            data = f.read()
+        self.fs[self._norm(remotepath)] = {"type": "file", "content": data}
+
+    def get(self, remotepath, localpath):
+        meta = self.fs.get(self._norm(remotepath), {"content": b"Demo file content\n"})
+        with open(localpath, "wb") as f:
+            f.write(meta.get("content", b""))
+
+    def close(self):
+        pass
+
+
+def get_or_rotate_vps_ssh_password(vps):
+    """Retrieve or provision the encrypted SSH root password for a VPS."""
+    metadata = vps.get("metadata") or {}
+    if isinstance(metadata, str):
+        try:
+            metadata = json.loads(metadata)
+        except Exception:
+            metadata = {}
+    existing = decrypt_vps_ssh_password(metadata.get("ssh_password_encrypted"))
+    if existing:
+        return existing
+    new_pwd = secrets.token_urlsafe(18)
+    if not DEMO_MODE:
+        configured = run_sync(configure_ssh_and_root_password(vps["container_name"], vps["node_id"], new_pwd))
+        if configured:
+            new_pwd = configured
+    metadata["ssh_password_encrypted"] = encrypt_vps_ssh_password(new_pwd)
+    try:
+        with get_db() as conn:
+            conn.execute("UPDATE vps SET metadata = ? WHERE id = ?", (json.dumps(metadata), vps["id"]))
+    except Exception:
+        pass
+    return new_pwd
+
+
 def get_sftp_connection(vps):
     """Create SFTP connection to VPS using its unique generated credential."""
+    if DEMO_MODE:
+        return _DemoSSHClient(), _DemoSFTPClient(vps['container_name'])
     import paramiko
     ssh_password = get_or_rotate_vps_ssh_password(vps)
 
@@ -4725,6 +4925,51 @@ def vps_control(vps_id, action):
 # ============================================================================
 # Console Routes - FIXED VERSION
 # ============================================================================
+@app.route('/vps/<int:vps_id>/execute', methods=['POST'])
+@login_required
+def vps_execute_command(vps_id):
+    vps = get_vps_by_id(vps_id)
+    if not vps or (vps['user_id'] != current_user.id and not current_user.is_admin):
+        return jsonify({'success': False, 'error': 'Access denied'}), 403
+    if is_vps_suspended(vps) and not current_user.is_admin:
+        return jsonify({'success': False, 'error': 'VPS is suspended'}), 403
+
+    data = request.get_json() or {}
+    command = (data.get('command') or '').strip()
+    if not command:
+        return jsonify({'success': False, 'error': 'Command is required'}), 400
+
+    cname = vps.get('container_name', 'zk-vps')
+    if DEMO_MODE:
+        cmd_lower = command.lower()
+        if cmd_lower in {'whoami', 'id'}:
+            out = "root (uid=0, gid=0)"
+        elif cmd_lower.startswith('uname'):
+            out = f"Linux {vps.get('hostname') or cname} 6.8.0-45-generic #45-Ubuntu SMP PREEMPT_DYNAMIC x86_64 GNU/Linux"
+        elif 'df' in cmd_lower or 'free' in cmd_lower:
+            out = (
+                f"Filesystem      Size  Used Avail Use% Mounted on\n"
+                f"lxd/containers  {vps.get('storage', 60)}G   14G   46G  24% /\n\n"
+                f"               total        used        free      shared  buff/cache   available\n"
+                f"Mem:            {vps.get('ram', 4096)}        1120        2180          24         796        2976"
+            )
+        elif cmd_lower.startswith('ls'):
+            out = "app  configs  deploy.sh  docker-compose.yml  README.md"
+        elif 'ip ' in cmd_lower or cmd_lower == 'ifconfig':
+            out = f"1: lo: <LOOPBACK,UP,LOWER_UP> inet 127.0.0.1/8\n2: eth0@if14: <BROADCAST,MULTICAST,UP,LOWER_UP> inet {vps.get('ip_address') or '10.108.14.21'}/24"
+        elif 'top' in cmd_lower or 'ps' in cmd_lower:
+            out = "  PID TTY          TIME CMD\n    1 ?        00:00:02 systemd\n  142 ?        00:00:01 sshd\n  218 ?        00:00:04 nginx\n  305 pts/0    00:00:00 bash"
+        else:
+            out = f"[Demo Shell · {cname}] Executed: {command}\nStatus: exit code 0"
+        return jsonify({'success': True, 'output': out})
+
+    try:
+        output = run_sync(execute_container(cname, f"exec {shlex.quote(cname)} -- sh -lc {shlex.quote(command)}", node_id=vps['node_id']))
+        return jsonify({'success': True, 'output': str(output or '')})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/vps/<int:vps_id>/console')
 @login_required
 def vps_console(vps_id):
@@ -7233,7 +7478,7 @@ def admin_maintenance():
 @login_required
 @admin_required
 def admin_backup():
-    backup_name = f"nrb_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+    backup_name = f"zk_vps_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
     
     try:
         os.makedirs('backups', exist_ok=True)
@@ -8713,7 +8958,7 @@ def resource_monitor():
                     logger.error(f"Auto expiration check error: {e}")
             
             if get_setting('backup_enabled', '1') == '1' and current_time - last_backup > backup_interval:
-                backup_name = f"nrb_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+                backup_name = f"zk_vps_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
                 backup_path = os.path.join('backups', backup_name)
                 try:
                     os.makedirs('backups', exist_ok=True)
@@ -8975,8 +9220,8 @@ if __name__ == "__main__":
             config = HyperConfig()
             config.bind = [f"{HOST}:{PORT}"]
             config.use_reloader = False
-            config.errorlog = logging.getLogger('nrb_panel')
-            config.accesslog = logging.getLogger('nrb_panel')
+            config.errorlog = logging.getLogger('zk_vps_panel')
+            config.accesslog = logging.getLogger('zk_vps_panel')
             config.workers = 4
             
             try:
