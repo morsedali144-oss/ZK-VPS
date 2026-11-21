@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+
+{% block title %}Cloud Dashboard · {{ panel_name | default('ZK-VPS-PANEL') }}{% endblock %}
+{% block header_title %}Cloud Workspace Dashboard{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumb">
+    <a href="{{ url_for('dashboard') }}" class="breadcrumb-item">Home</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <span class="breadcrumb-item active">Dashboard</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Welcome Hero Banner -->
+<div class="card" style="margin-bottom: 1.5rem; background: linear-gradient(125deg, rgba(23, 43, 86, 0.88) 0%, rgba(11, 20, 40, 0.95) 100%); border-color: rgba(59, 130, 246, 0.28);">
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <div style="font-size: 0.76rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--cyan-400); margin-bottom: 0.25rem;">
+                <i class="fas fa-satellite-dish"></i> Real-Time Infrastructure Overview
+            </div>
+            <h2 style="font-size: 1.45rem; font-weight: 800; margin-bottom: 0.25rem;">Welcome back, {{ current_user.username }}</h2>
+            <p style="font-size: 0.88rem; color: var(--text-secondary);">
+                Monitor your virtual server fleet, resource utilization, and NAT port allocations from one unified control plane.
+            </p>
+        </div>
+        <div style="display: flex; gap: 0.65rem; flex-wrap: wrap;">
+            <a href="{{ url_for('vps_list') }}" class="btn btn-outline">
+                <i class="fas fa-server"></i> My Instances
+            </a>
+            <a href="{{ url_for('ports_list') }}" class="btn btn-outline">
+                <i class="fas fa-network-wired"></i> Port Forwarding
+            </a>
+            {% if current_user.is_admin %}
+            <a href="{{ url_for('admin_vps_create') }}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Deploy New VPS
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- KPI Summary Cards -->
+<div class="grid grid-4" style="margin-bottom: 1.5rem;">
+    <div class="stat-card">
+        <div class="stat-icon primary">
+            <i class="fas fa-server"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-label">Total Instances</div>
+            <div class="stat-value">{{ vps_count | default(0) }}</div>
+            <div class="stat-change">
+                <span style="color: #34d399;"><i class="fas fa-circle" style="font-size: 0.5rem;"></i> {{ running_count | default(0) }} Running</span>
+                <span>· {{ stopped_count | default(0) }} Stopped</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon info">
+            <i class="fas fa-microchip"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-label">Allocated vCPU</div>
+            <div class="stat-value">{{ total_cpu | default(0) }} <span style="font-size: 0.9rem; font-weight: 600; color: var(--text-secondary);">Cores</span></div>
+            <div class="stat-change">
+                <i class="fas fa-bolt" style="color: var(--cyan-400);"></i> Dedicated LXD compute threads
+            </div>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon success">
+            <i class="fas fa-memory"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-label">Allocated Memory</div>
+            <div class="stat-value">{{ ((total_ram | default(0)) / 1024) | round(1) }} <span style="font-size: 0.9rem; font-weight: 600; color: var(--text-secondary);">GB</span></div>
+            <div class="stat-change">
+                <i class="fas fa-hdd" style="color: #34d399;"></i> {{ total_disk | default(0) }} GB NVMe Storage
+            </div>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon warning">
+            <i class="fas fa-circle-nodes"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-label">Active Nodes</div>
+            <div class="stat-value">{{ (node_status | length) if node_status else 1 }}</div>
+            <div class="stat-change">
+                <span style="color: #34d399;">Cluster Online</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Active Servers Section -->
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-cubes"></i> Virtual Private Servers</h3>
+        <div style="display: flex; gap: 0.6rem; align-items: center;">
+            <input type="text" id="dashVpsSearch" class="form-control" placeholder="Filter servers..." style="width: 220px; padding: 0.42rem 0.75rem; font-size: 0.82rem;">
+            <a href="{{ url_for('vps_list') }}" class="btn btn-outline btn-sm">View All</a>
+        </div>
+    </div>
+
+    {% if vps_list %}
+    <div class="table-responsive">
+        <table class="table" id="dashVpsTable">
+            <thead>
+                <tr>
+                    <th>Instance</th>
+                    <th>Status</th>
+                    <th>Node / OS</th>
+                    <th>Resources</th>
+                    <th>IP / SSH Port</th>
+                    <th>Live Telemetry</th>
+                    <th style="text-align: right;">Quick Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for vps in vps_list %}
+                {% set st = vps.live_status | default(vps.status) | default('stopped') %}
+                <tr class="dash-vps-row" data-search="{{ (vps.hostname or vps.container_name) | lower }} {{ (vps.ip_address or '') | lower }}">
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <div class="stat-icon primary" style="width: 38px; height: 38px; border-radius: 10px; font-size: 1rem;">
+                                <i class="{{ get_os_icon(vps.os_version) }}"></i>
+                            </div>
+                            <div>
+                                <a href="{{ url_for('vps_detail', vps_id=vps.id) }}" style="font-weight: 700; color: #fff; font-size: 0.92rem;">
+                                    {{ vps.hostname or vps.container_name }}
+                                </a>
+                                <div class="mono" style="font-size: 0.73rem; color: var(--text-muted);">{{ vps.container_name }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        {% if vps.suspended %}
+                        <span class="status-indicator">
+                            <span class="status-dot suspended"></span>
+                            <span style="color: #fcd34d;">Suspended</span>
+                        </span>
+                        {% else %}
+                        <span class="status-indicator">
+                            <span class="status-dot {{ st }}"></span>
+                            <span>{{ st | upper }}</span>
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div style="font-weight: 600; font-size: 0.84rem;">{{ vps.node_name | default('Local Node') }}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">{{ vps.os_version }}</div>
+                    </td>
+                    <td>
+                        <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+                            <span class="badge badge-primary">{{ vps.cpu }} vCPU</span>
+                            <span class="badge badge-info">{{ vps.ram }} MB</span>
+                            <span class="badge badge-secondary">{{ vps.storage }} GB</span>
+                        </div>
+                    </td>
+                    <td class="mono" style="font-size: 0.8rem;">
+                        <div>{{ vps.ip_address or 'DHCP' }}</div>
+                        {% if vps.ssh_port %}
+                        <div style="color: var(--cyan-400); font-size: 0.73rem;">Port {{ vps.ssh_port }}</div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div style="display: flex; flex-direction: column; gap: 0.25rem; min-width: 120px;">
+                            <div style="display: flex; justify-content: space-between; font-size: 0.73rem;">
+                                <span style="color: var(--text-muted);">CPU</span>
+                                <span class="vps-cpu mono" data-id="{{ vps.id }}">0.0%</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.73rem;">
+                                <span style="color: var(--text-muted);">RAM</span>
+                                <span class="vps-ram mono" data-id="{{ vps.id }}">0.0%</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td style="text-align: right;">
+                        <div style="display: inline-flex; gap: 0.35rem;">
+                            <a href="{{ url_for('vps_detail', vps_id=vps.id) }}" class="btn btn-primary btn-sm" title="Manage Server">
+                                <i class="fas fa-sliders"></i> Manage
+                            </a>
+                            {% if not vps.suspended %}
+                            <a href="{{ url_for('vps_console', vps_id=vps.id) }}" class="btn btn-outline btn-sm" title="Web Console">
+                                <i class="fas fa-terminal"></i>
+                            </a>
+                            {% if st == 'running' %}
+                            <button type="button" class="btn btn-warning btn-sm" onclick="controlVps({{ vps.id }}, 'restart')" title="Restart">
+                                <i class="fas fa-rotate"></i>
+                            </button>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="controlVps({{ vps.id }}, 'stop')" title="Stop">
+                                <i class="fas fa-stop"></i>
+                            </button>
+                            {% else %}
+                            <button type="button" class="btn btn-success btn-sm" onclick="controlVps({{ vps.id }}, 'start')" title="Start">
+                                <i class="fas fa-play"></i>
+                            </button>
+                            {% endif %}
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="fas fa-server"></i>
+        <h3>No Virtual Servers Assigned</h3>
+        <p>You currently have no virtual private servers deployed in your workspace.</p>
+        {% if current_user.is_admin %}
+        <a href="{{ url_for('admin_vps_create') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Deploy First VPS
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function controlVps(vpsId, action) {
+    showLoading();
+    fetch(`/vps/${vpsId}/control/${action}`, { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+            hideLoading();
+            if (d.success) {
+                showToast(d.message || `Server ${action} initiated`, 'success');
+                setTimeout(() => location.reload(), 900);
+            } else {
+                showToast(d.error || `Failed to ${action} server`, 'danger');
+            }
+        })
+        .catch(() => {
+            hideLoading();
+            showToast('Network error communicating with panel', 'danger');
+        });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('dashVpsSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            const q = this.value.toLowerCase().trim();
+            document.querySelectorAll('.dash-vps-row').forEach(row => {
+                row.style.display = row.dataset.search.includes(q) ? '' : 'none';
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

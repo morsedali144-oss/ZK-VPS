@@ -1,0 +1,97 @@
+{% extends "admin-base.html" %}
+
+{% block title %}User Profile · {{ user.username }} · {{ panel_name | default('ZK-VPS-PANEL') }}{% endblock %}
+{% block header_title %}User Overview · {{ user.username }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumb">
+    <a href="{{ url_for('admin_dashboard') }}" class="breadcrumb-item">Admin</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <a href="{{ url_for('admin_users') }}" class="breadcrumb-item">Users</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <span class="breadcrumb-item active">{{ user.username }}</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-3" style="margin-bottom: 1.4rem;">
+    <div class="stat-card">
+        <div class="stat-icon primary"><i class="fas fa-user"></i></div>
+        <div class="stat-content">
+            <div class="stat-label">{{ user.email }}</div>
+            <div class="stat-value">{{ user.username }}</div>
+            <div class="stat-change">Joined {{ user.created_at | timeago }}</div>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon info"><i class="fas fa-server"></i></div>
+        <div class="stat-content">
+            <div class="stat-label">Owned VPS Instances</div>
+            <div class="stat-value">{{ (vps_list or []) | length }}</div>
+            <div class="stat-change">Active virtual servers</div>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon warning"><i class="fas fa-network-wired"></i></div>
+        <div class="stat-content">
+            <div class="stat-label">Port Quota Usage</div>
+            <div class="stat-value">{{ used_ports | default(0) }} / {{ allocated_ports | default(0) }}</div>
+            <div class="stat-change">
+                <a href="{{ url_for('admin_user_edit', user_id=user.id) }}">Edit User & Port Quota <i class="fas fa-arrow-right"></i></a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- User's VPS List -->
+<div class="card" style="margin-bottom: 1.4rem;">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-cubes"></i> Assigned Virtual Servers</h3>
+        <div style="display: flex; gap: 0.5rem;">
+            <a href="{{ url_for('admin_user_edit', user_id=user.id) }}" class="btn btn-outline btn-sm">
+                <i class="fas fa-pen"></i> Edit User
+            </a>
+            <a href="{{ url_for('admin_vps_create') }}" class="btn btn-primary btn-sm">
+                <i class="fas fa-plus"></i> Deploy VPS
+            </a>
+        </div>
+    </div>
+
+    {% if vps_list %}
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Hostname</th>
+                    <th>Node</th>
+                    <th>Specs</th>
+                    <th>IP Address</th>
+                    <th>Status</th>
+                    <th style="text-align: right;">Manage</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for v in vps_list %}
+                <tr>
+                    <td class="mono">#{{ v.id }}</td>
+                    <td><a href="{{ url_for('vps_detail', vps_id=v.id) }}" style="font-weight: 700; color: #fff;">{{ v.hostname or v.container_name }}</a></td>
+                    <td>{{ v.node_name or 'Local' }}</td>
+                    <td>{{ v.cpu }} vCPU · {{ v.ram }} MB · {{ v.storage }} GB</td>
+                    <td class="mono">{{ v.ip_address or 'DHCP' }}</td>
+                    <td><span class="badge badge-{{ 'danger' if v.suspended else 'success' if v.status == 'running' else 'secondary' }}">{{ 'SUSPENDED' if v.suspended else v.status | upper }}</span></td>
+                    <td style="text-align: right;">
+                        <a href="{{ url_for('vps_detail', vps_id=v.id) }}" class="btn btn-outline btn-xs">Details</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state" style="padding: 1.75rem;"><p>No virtual servers assigned to this user.</p></div>
+    {% endif %}
+</div>
+{% endblock %}

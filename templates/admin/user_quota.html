@@ -1,0 +1,70 @@
+{% extends "admin-base.html" %}
+
+{% block title %}Port Quota · {{ user.username }} · {{ panel_name | default('ZK-VPS-PANEL') }}{% endblock %}
+{% block header_title %}Manage Port Quota · {{ user.username }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumb">
+    <a href="{{ url_for('admin_dashboard') }}" class="breadcrumb-item">Admin</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <a href="{{ url_for('admin_users') }}" class="breadcrumb-item">Users</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <span class="breadcrumb-item active">Port Quota</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 720px; margin: 0 auto 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-network-wired"></i> NAT Port Allocation Quota for {{ user.username }}</h3>
+        <a href="{{ url_for('admin_users') }}" class="btn btn-outline btn-sm">Back</a>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('admin_user_quota', user_id=user.id) }}">
+        <div class="form-group">
+            <label class="form-label">Maximum Allowed Port Forwards (Currently using {{ used_ports | default(0) }})</label>
+            <input type="number" name="quota" class="form-control" value="{{ quota | default(0) }}" min="{{ used_ports | default(0) }}" required>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+            <a href="{{ url_for('admin_users') }}" class="btn btn-outline">Cancel</a>
+            <button type="submit" class="btn btn-primary">Update Quota</button>
+        </div>
+    </form>
+</div>
+
+{% if ports %}
+<div class="card" style="max-width: 720px; margin: 0 auto;">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-plug"></i> Active Port Forwards ({{ ports | length }})</h3>
+    </div>
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Rule</th>
+                    <th>VPS</th>
+                    <th>Protocol</th>
+                    <th>Internal</th>
+                    <th>External</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in ports %}
+                <tr>
+                    <td>{{ p.name }}</td>
+                    <td>{{ p.vps_hostname or p.container_name }}</td>
+                    <td><span class="badge badge-info">{{ p.protocol | upper }}</span></td>
+                    <td class="mono">{{ p.vps_port }}</td>
+                    <td class="mono" style="color: var(--cyan-400);">{{ p.host_port }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

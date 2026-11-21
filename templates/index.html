@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome to {{ panel_name | default('ZK-VPS-PANEL') }}{% endblock %}
+{% block header_title %}{{ panel_name | default('ZK-VPS-PANEL') }} Cloud Platform{% endblock %}
+
+{% block content %}
+<div class="zk-hero-wrap" style="padding: 1.5rem 0 2.5rem;">
+    <!-- Hero Banner -->
+    <div class="card" style="padding: 3.2rem 2.5rem; background: linear-gradient(135deg, rgba(13, 25, 52, 0.96) 0%, rgba(7, 14, 30, 0.98) 100%); border-color: rgba(59, 130, 246, 0.3); overflow: hidden; position: relative; margin-bottom: 2rem;">
+        <div style="position: absolute; right: -80px; top: -80px; width: 340px; height: 340px; border-radius: 50%; background: radial-gradient(circle, rgba(37, 99, 235, 0.25) 0%, transparent 70%); pointer-events: none;"></div>
+        <div style="max-width: 780px; position: relative; z-index: 1;">
+            <div class="badge badge-primary" style="margin-bottom: 1rem; padding: 0.35rem 0.85rem; font-size: 0.78rem;">
+                <i class="fas fa-bolt"></i> Next-Generation LXD Virtualization Control Plane
+            </div>
+            <h1 style="font-size: 2.75rem; font-weight: 800; line-height: 1.15; margin-bottom: 1rem; background: linear-gradient(90deg, #ffffff 0%, #93c5fd 55%, #38bdf8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                Orchestrate High-Performance Cloud Servers with {{ panel_name | default('ZK-VPS-PANEL') }}
+            </h1>
+            <p style="font-size: 1.05rem; color: var(--text-secondary); margin-bottom: 2rem; max-width: 650px;">
+                {{ site_description | default('Deploy, monitor, and scale isolated LXD virtual private servers with real-time resource telemetry, web terminal console, automated snapshots, SFTP file management, and multi-node clustering.') }}
+            </p>
+            <div style="display: flex; gap: 0.9rem; flex-wrap: wrap;">
+                {% if current_user.is_authenticated %}
+                <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg">
+                    <i class="fas fa-gauge-high"></i> Launch Console
+                </a>
+                <a href="{{ url_for('vps_list') }}" class="btn btn-outline btn-lg">
+                    <i class="fas fa-server"></i> View My Instances
+                </a>
+                {% else %}
+                <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg">
+                    <i class="fas fa-right-to-bracket"></i> Sign In to Panel
+                </a>
+                {% if get_setting('registration_enabled', '1') == '1' %}
+                <a href="{{ url_for('register') }}" class="btn btn-outline btn-lg">
+                    <i class="fas fa-user-plus"></i> Create Cloud Account
+                </a>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Core Capabilities Grid -->
+    <div class="grid grid-3" style="margin-bottom: 2rem;">
+        <div class="card">
+            <div class="stat-icon primary" style="margin-bottom: 1rem;">
+                <i class="fas fa-bolt-lightning"></i>
+            </div>
+            <h3 style="font-size: 1.1rem; margin-bottom: 0.5rem;">Instant LXD Provisioning</h3>
+            <p style="color: var(--text-secondary); font-size: 0.88rem;">
+                Spin up Ubuntu and Debian LXD containers in seconds with dedicated CPU, RAM, disk quotas, and bandwidth shaping.
+            </p>
+        </div>
+
+        <div class="card">
+            <div class="stat-icon info" style="margin-bottom: 1rem;">
+                <i class="fas fa-terminal"></i>
+            </div>
+            <h3 style="font-size: 1.1rem; margin-bottom: 0.5rem;">Web Shell & SFTP Explorer</h3>
+            <p style="color: var(--text-secondary); font-size: 0.88rem;">
+                Access full interactive Xterm.js web consoles, one-click SSH credentials, and integrated browser SFTP file management.
+            </p>
+        </div>
+
+        <div class="card">
+            <div class="stat-icon success" style="margin-bottom: 1rem;">
+                <i class="fas fa-shield-halved"></i>
+            </div>
+            <h3 style="font-size: 1.1rem; margin-bottom: 0.5rem;">Snapshots, Backups & NAT</h3>
+            <p style="color: var(--text-secondary); font-size: 0.88rem;">
+                Protect workloads with point-in-time snapshots, automated backups, firewall rules, and dynamic TCP/UDP port forwarding.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

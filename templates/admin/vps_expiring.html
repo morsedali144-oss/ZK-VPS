@@ -1,0 +1,107 @@
+{% extends "admin-base.html" %}
+
+{% block title %}Expiring Servers · {{ panel_name | default('ZK-VPS-PANEL') }}{% endblock %}
+{% block header_title %}Expiring & Expired Virtual Servers{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumb">
+    <a href="{{ url_for('admin_dashboard') }}" class="breadcrumb-item">Admin</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <span class="breadcrumb-item active">Expiring Servers</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-3" style="margin-bottom: 1.5rem;">
+    <div class="stat-card">
+        <div class="stat-icon danger"><i class="fas fa-calendar-xmark"></i></div>
+        <div class="stat-content">
+            <div class="stat-label">Already Expired</div>
+            <div class="stat-value">{{ expired_count | default(0) }}</div>
+            <div class="stat-change">Requires renewal or cleanup</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon warning"><i class="fas fa-hourglass-half"></i></div>
+        <div class="stat-content">
+            <div class="stat-label">Expiring Within {{ days_ahead | default(7) }}d</div>
+            <div class="stat-value">{{ expiring_soon_count | default(0) }}</div>
+            <div class="stat-change">Upcoming expirations</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon info"><i class="fas fa-clock"></i></div>
+        <div class="stat-content">
+            <div class="stat-label">Total With Expiration</div>
+            <div class="stat-value">{{ total_with_expiration | default(0) }}</div>
+            <div class="stat-change">Lifecycle-managed instances</div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-hourglass-half"></i> Expiring Servers Window</h3>
+        <div style="display: flex; gap: 0.5rem;">
+            <a href="{{ url_for('admin_vps_expiring') }}?days=7" class="btn btn-{{ 'primary' if (days_ahead | default(7)) == 7 else 'outline' }} btn-sm">7 Days</a>
+            <a href="{{ url_for('admin_vps_expiring') }}?days=30" class="btn btn-{{ 'primary' if (days_ahead | default(7)) == 30 else 'outline' }} btn-sm">30 Days</a>
+            <a href="{{ url_for('admin_vps_expiring') }}?days=90" class="btn btn-{{ 'primary' if (days_ahead | default(7)) == 90 else 'outline' }} btn-sm">90 Days</a>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Server</th>
+                    <th>Owner</th>
+                    <th>Node</th>
+                    <th>Expires At</th>
+                    <th>Status</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="expiringTableBody">
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                        Loading expiring servers...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const days = {{ days_ahead | default(7) }};
+    fetch(`/admin/vps/expiring?days=${days}`, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(d => {
+        const tbody = document.getElementById('expiringTableBody');
+        if (!d.success || !d.data || d.data.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:2.5rem;color:var(--text-muted);">No virtual servers expiring within the next ${days} days.</td></tr>`;
+            return;
+        }
+        tbody.innerHTML = d.data.map(v => `
+            <tr>
+                <td><a href="/vps/${v.id}" style="font-weight:700;color:#fff;">${v.hostname || v.container_name}</a></td>
+                <td>${v.username} (${v.email})</td>
+                <td>${v.node_name || 'Local'}</td>
+                <td class="mono">${v.expires_at_formatted}</td>
+                <td>
+                    <span class="badge badge-${v.is_expired ? 'danger' : 'warning'}">
+                        ${v.is_expired ? 'EXPIRED' : `${v.days_remaining}d ${v.hours_remaining % 24}h left`}
+                    </span>
+                </td>
+                <td style="text-align:right;">
+                    <a href="/admin/vps/${v.id}/expiration" class="btn btn-primary btn-xs">Renew / Configure</a>
+                </td>
+            </tr>
+        `).join('');
+    });
+});
+</script>
+{% endblock %}

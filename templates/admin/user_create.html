@@ -1,0 +1,70 @@
+{% extends "admin-base.html" %}
+
+{% block title %}Create User · {{ panel_name | default('ZK-VPS-PANEL') }}{% endblock %}
+{% block header_title %}Create New User Account{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumb">
+    <a href="{{ url_for('admin_dashboard') }}" class="breadcrumb-item">Admin</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <a href="{{ url_for('admin_users') }}" class="breadcrumb-item">Users</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <span class="breadcrumb-item active">Create User</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 680px; margin: 0 auto;">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-user-plus"></i> New User Details</h3>
+        <a href="{{ url_for('admin_users') }}" class="btn btn-outline btn-sm">Back to Users</a>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-danger">
+        <i class="fas fa-circle-exclamation"></i>
+        <span>{{ error }}</span>
+    </div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('admin_user_create') }}">
+        <div class="grid grid-2">
+            <div class="form-group">
+                <label class="form-label">Username</label>
+                <input type="text" name="username" class="form-control" required autofocus>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Email Address</label>
+                <input type="email" name="email" class="form-control" required>
+            </div>
+        </div>
+
+        <div class="grid grid-2">
+            <div class="form-group">
+                <label class="form-label">Password</label>
+                <input type="password" name="password" class="form-control" placeholder="Min 6 characters" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">NAT Port Quota</label>
+                <input type="number" name="port_quota" class="form-control" value="5" min="0">
+            </div>
+        </div>
+
+        {% if current_user.is_main_admin %}
+        <div style="display: flex; align-items: center; gap: 0.65rem; margin-bottom: 1.4rem;">
+            <input type="checkbox" id="isAdminChk" name="is_admin" style="accent-color: var(--blue-500); width: 16px; height: 16px;">
+            <label for="isAdminChk" style="font-size: 0.86rem; color: var(--text-secondary);">
+                Grant Administrator privileges to this user
+            </label>
+        </div>
+        {% endif %}
+
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+            <a href="{{ url_for('admin_users') }}" class="btn btn-outline">Cancel</a>
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-user-check"></i> Create User Account
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

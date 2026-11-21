@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block title %}My Servers · {{ panel_name | default('ZK-VPS-PANEL') }}{% endblock %}
+{% block header_title %}My Virtual Servers{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumb">
+    <a href="{{ url_for('dashboard') }}" class="breadcrumb-item">Home</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <span class="breadcrumb-item active">My Servers</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Toolbar -->
+<div class="card" style="margin-bottom: 1.5rem; padding: 1.1rem 1.35rem;">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1; min-width: 260px;">
+            <div style="position: relative; flex: 1; max-width: 360px;">
+                <i class="fas fa-search" style="position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+                <input type="text" id="vpsSearchInput" class="form-control" style="padding-left: 2.35rem;" placeholder="Search hostname, container, or IP...">
+            </div>
+            <select id="vpsStatusFilter" class="form-control" style="width: 170px;">
+                <option value="all">All Statuses</option>
+                <option value="running">Running</option>
+                <option value="stopped">Stopped</option>
+                <option value="suspended">Suspended</option>
+            </select>
+        </div>
+        <div style="display: flex; gap: 0.6rem;">
+            <button type="button" class="btn btn-outline btn-sm" onclick="location.reload()">
+                <i class="fas fa-rotate"></i> Refresh
+            </button>
+            {% if current_user.is_admin %}
+            <a href="{{ url_for('admin_vps_create') }}" class="btn btn-primary btn-sm">
+                <i class="fas fa-plus"></i> Deploy Server
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if vps_list %}
+<div class="grid grid-3" id="vpsCardsGrid">
+    {% for vps in vps_list %}
+    {% set live_st = vps.live_status | default(vps.status) | default('stopped') %}
+    {% set state_key = 'suspended' if vps.suspended else live_st %}
+    <div class="card vps-instance-card"
+         data-name="{{ (vps.hostname or vps.container_name) | lower }} {{ (vps.ip_address or '') | lower }}"
+         data-status="{{ state_key }}"
+         style="display: flex; flex-direction: column; justify-content: space-between; gap: 1.15rem;">
+        <div>
+            <!-- Instance Header -->
+            <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; margin-bottom: 1rem;">
+                <div style="display: flex; align-items: center; gap: 0.8rem;">
+                    <div class="stat-icon primary" style="width: 44px; height: 44px; border-radius: 12px; font-size: 1.2rem;">
+                        <i class="{{ get_os_icon(vps.os_version) }}"></i>
+                    </div>
+                    <div>
+                        <a href="{{ url_for('vps_detail', vps_id=vps.id) }}" style="font-size: 1.05rem; font-weight: 700; color: #fff; display: block;">
+                            {{ vps.hostname or vps.container_name }}
+                        </a>
+                        <span class="mono" style="font-size: 0.74rem; color: var(--text-muted);">{{ vps.container_name }}</span>
+                    </div>
+                </div>
+                {% if vps.suspended %}
+                <span class="status-indicator">
+                    <span class="status-dot suspended"></span>
+                    <span style="color: #fcd34d;">SUSPENDED</span>
+                </span>
+                {% else %}
+                <span class="status-indicator">
+                    <span class="status-dot {{ live_st }}"></span>
+                    <span>{{ live_st | upper }}</span>
+                </span>
+                {% endif %}
+            </div>
+
+            {% if vps.suspended %}
+            <div class="alert alert-danger" style="padding: 0.65rem 0.85rem; font-size: 0.78rem; margin-bottom: 1rem;">
+                <i class="fas fa-ban"></i>
+                <span>Suspended: {{ vps.suspended_reason or vps.suspension_reason or 'Contact administrator' }}</span>
+            </div>
+            {% endif %}
+
+            <!-- Specs Pills -->
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-bottom: 1rem;">
+                <div style="background: rgba(7, 13, 25, 0.7); border: 1px solid var(--border-color); border-radius: 9px; padding: 0.55rem; text-align: center;">
+                    <div style="font-size: 0.68rem; color: var(--text-muted);">vCPU</div>
+                    <div style="font-weight: 700; font-size: 0.88rem; color: var(--blue-300);">{{ vps.cpu }} Cores</div>
+                </div>
+                <div style="background: rgba(7, 13, 25, 0.7); border: 1px solid var(--border-color); border-radius: 9px; padding: 0.55rem; text-align: center;">
+                    <div style="font-size: 0.68rem; color: var(--text-muted);">RAM</div>
+                    <div style="font-weight: 700; font-size: 0.88rem; color: var(--cyan-400);">{{ vps.ram }} MB</div>
+                </div>
+                <div style="background: rgba(7, 13, 25, 0.7); border: 1px solid var(--border-color); border-radius: 9px; padding: 0.55rem; text-align: center;">
+                    <div style="font-size: 0.68rem; color: var(--text-muted);">NVMe</div>
+                    <div style="font-weight: 700; font-size: 0.88rem; color: #34d399;">{{ vps.storage }} GB</div>
+                </div>
+            </div>
+
+            <!-- Connection Metadata -->
+            <div style="background: rgba(5, 10, 20, 0.6); border: 1px solid rgba(59, 130, 246, 0.12); border-radius: 10px; padding: 0.75rem 0.9rem; font-size: 0.8rem; display: flex; flex-direction: column; gap: 0.4rem;">
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-muted);">Node Location</span>
+                    <span style="font-weight: 600;">{{ vps.node_name | default('Local Node') }}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-muted);">IPv4 Address</span>
+                    <span class="mono">{{ vps.ip_address or 'DHCP Assigned' }}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-muted);">SSH Port</span>
+                    <span class="mono" style="color: var(--cyan-400);">{{ vps.ssh_port or 'Not Configured' }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card Actions -->
+        <div style="display: flex; gap: 0.45rem; padding-top: 0.9rem; border-top: 1px solid var(--border-color); flex-wrap: wrap;">
+            <a href="{{ url_for('vps_detail', vps_id=vps.id) }}" class="btn btn-primary btn-sm" style="flex: 1;">
+                <i class="fas fa-sliders"></i> Manage
+            </a>
+            {% if not vps.suspended %}
+            <a href="{{ url_for('vps_console', vps_id=vps.id) }}" class="btn btn-outline btn-sm" title="Terminal Console">
+                <i class="fas fa-terminal"></i>
+            </a>
+            <a href="{{ url_for('vps_files', vps_id=vps.id) }}" class="btn btn-outline btn-sm" title="SFTP File Manager">
+                <i class="fas fa-folder-open"></i>
+            </a>
+            {% if live_st == 'running' %}
+            <button type="button" class="btn btn-warning btn-sm" onclick="vpsAction({{ vps.id }}, 'restart')" title="Restart">
+                <i class="fas fa-rotate"></i>
+            </button>
+            <button type="button" class="btn btn-danger btn-sm" onclick="vpsAction({{ vps.id }}, 'stop')" title="Stop">
+                <i class="fas fa-stop"></i>
+            </button>
+            {% else %}
+            <button type="button" class="btn btn-success btn-sm" onclick="vpsAction({{ vps.id }}, 'start')" title="Start">
+                <i class="fas fa-play"></i>
+            </button>
+            {% endif %}
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card">
+    <div class="empty-state">
+        <i class="fas fa-server"></i>
+        <h3>No Servers Found</h3>
+        <p>You don't have any virtual servers yet.</p>
+        {% if current_user.is_admin %}
+        <a href="{{ url_for('admin_vps_create') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Deploy New VPS
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function vpsAction(vpsId, action) {
+    showLoading();
+    fetch(`/vps/${vpsId}/control/${action}`, { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+            hideLoading();
+            if (d.success) {
+                showToast(d.message || `Server ${action} completed`, 'success');
+                setTimeout(() => location.reload(), 900);
+            } else {
+                showToast(d.error || 'Action failed', 'danger');
+            }
+        })
+        .catch(() => {
+            hideLoading();
+            showToast('Network error', 'danger');
+        });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('vpsSearchInput');
+    const statusFilter = document.getElementById('vpsStatusFilter');
+
+    function filterCards() {
+        const q = (searchInput?.value || '').toLowerCase().trim();
+        const st = statusFilter?.value || 'all';
+        document.querySelectorAll('.vps-instance-card').forEach(card => {
+            const matchText = card.dataset.name.includes(q);
+            const matchStatus = st === 'all' || card.dataset.status === st;
+            card.style.display = (matchText && matchStatus) ? 'flex' : 'none';
+        });
+    }
+
+    searchInput?.addEventListener('input', filterCards);
+    statusFilter?.addEventListener('change', filterCards);
+});
+</script>
+{% endblock %}

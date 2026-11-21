@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}Notifications · {{ panel_name | default('ZK-VPS-PANEL') }}{% endblock %}
+{% block header_title %}System Notifications{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumb">
+    <a href="{{ url_for('dashboard') }}" class="breadcrumb-item">Home</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <span class="breadcrumb-item active">Notifications</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-bell"></i> Activity & Alert Feed</h3>
+        {% if notifications %}
+        <button type="button" class="btn btn-outline btn-sm" onclick="markAllReadPage()">
+            <i class="fas fa-check-double"></i> Mark All as Read
+        </button>
+        {% endif %}
+    </div>
+
+    {% if notifications %}
+    <div class="notifications-list">
+        {% for notif in notifications %}
+        <div class="notification-item {% if not notif.read %}unread{% endif %}" id="notif-row-{{ notif.id }}">
+            <div class="notification-icon {{ notif.type }}">
+                <i class="fas fa-{{ 'circle-check' if notif.type == 'success' else 'triangle-exclamation' if notif.type == 'warning' else 'circle-exclamation' if notif.type in ['danger', 'error'] else 'circle-info' }}"></i>
+            </div>
+            <div class="notification-content">
+                <div class="notification-title">{{ notif.title }}</div>
+                <div class="notification-message">{{ notif.message }}</div>
+                <div class="notification-time">{{ notif.created_at | timeago }}</div>
+            </div>
+            {% if not notif.read %}
+            <button type="button" class="btn btn-outline btn-xs" onclick="markSingleRead({{ notif.id }})">
+                Mark Read
+            </button>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="fas fa-bell-slash"></i>
+        <h3>All Caught Up</h3>
+        <p>You have no notifications in your activity feed.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function markSingleRead(id) {
+    fetch(`/notifications/mark-read/${id}`, { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+            if (d.success) {
+                location.reload();
+            }
+        });
+}
+function markAllReadPage() {
+    fetch('/notifications/mark-all-read', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+            if (d.success) {
+                showToast('All notifications marked read', 'success');
+                setTimeout(() => location.reload(), 600);
+            }
+        });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,205 @@
+{% extends "admin-base.html" %}
+
+{% block title %}Admin Console · {{ panel_name | default('ZK-VPS-PANEL') }}{% endblock %}
+{% block header_title %}Cluster Administration Overview{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumb">
+    <a href="{{ url_for('dashboard') }}" class="breadcrumb-item">Home</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <span class="breadcrumb-item active">Admin Dashboard</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Top KPI Grid -->
+<div class="grid grid-4" style="margin-bottom: 1.4rem;">
+    <div class="stat-card">
+        <div class="stat-icon primary"><i class="fas fa-users"></i></div>
+        <div class="stat-content">
+            <div class="stat-label">Registered Users</div>
+            <div class="stat-value">{{ total_users | default(0) }}</div>
+            <div class="stat-change">
+                <a href="{{ url_for('admin_users') }}">Manage accounts <i class="fas fa-arrow-right"></i></a>
+            </div>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon info"><i class="fas fa-cubes"></i></div>
+        <div class="stat-content">
+            <div class="stat-label">Provisioned VPS</div>
+            <div class="stat-value">{{ total_vps | default(0) }}</div>
+            <div class="stat-change">
+                <span style="color: #34d399;">{{ running_vps | default(0) }} Running</span>
+                {% if suspended_vps %}
+                <span style="color: #f87171;">· {{ suspended_vps }} Suspended</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon success"><i class="fas fa-circle-nodes"></i></div>
+        <div class="stat-content">
+            <div class="stat-label">Cluster Nodes</div>
+            <div class="stat-value">{{ online_nodes | default(0) }} <span style="font-size: 0.9rem; color: var(--text-secondary);">/ {{ total_nodes | default(0) }}</span></div>
+            <div class="stat-change">
+                <a href="{{ url_for('admin_nodes') }}">View LXD nodes <i class="fas fa-arrow-right"></i></a>
+            </div>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon warning"><i class="fas fa-network-wired"></i></div>
+        <div class="stat-content">
+            <div class="stat-label">NAT Port Forwards</div>
+            <div class="stat-value">{{ used_ports | default(0) }} <span style="font-size: 0.9rem; color: var(--text-secondary);">/ {{ total_ports | default(0) }}</span></div>
+            <div class="stat-change">Active port mappings across cluster</div>
+        </div>
+    </div>
+</div>
+
+<!-- Host System Telemetry & Quick Admin Actions -->
+{% set h_cpu = (host_stats.cpu if host_stats and host_stats.cpu is defined else 0) | float %}
+{% set h_ram = (host_stats.ram.pct if host_stats and host_stats.ram is mapping and host_stats.ram.pct is defined else 0) | float %}
+{% set h_disk = (host_stats.disk.pct if host_stats and host_stats.disk is mapping and host_stats.disk.pct is defined else 0) | float %}
+<div class="grid grid-3" style="margin-bottom: 1.4rem;">
+    <div class="card" style="grid-column: span 2;">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-gauge-high"></i> Host Node Resource Telemetry</h3>
+            <span class="badge badge-info">Live Metrics</span>
+        </div>
+        <div class="grid grid-3">
+            <div style="background: var(--bg-inset); padding: 1rem; border-radius: 12px; border: 1px solid var(--border-color);">
+                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.45rem;">
+                    <span style="color: var(--text-secondary);">Host CPU Load</span>
+                    <strong class="mono" style="color: var(--blue-300);">{{ h_cpu | round(1) }}%</strong>
+                </div>
+                <div class="progress">
+                    <div class="progress-bar info" style="width: {{ h_cpu }}%;"></div>
+                </div>
+            </div>
+
+            <div style="background: var(--bg-inset); padding: 1rem; border-radius: 12px; border: 1px solid var(--border-color);">
+                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.45rem;">
+                    <span style="color: var(--text-secondary);">Host Memory</span>
+                    <strong class="mono" style="color: var(--cyan-400);">{{ h_ram | round(1) }}%</strong>
+                </div>
+                <div class="progress">
+                    <div class="progress-bar success" style="width: {{ h_ram }}%;"></div>
+                </div>
+            </div>
+
+            <div style="background: var(--bg-inset); padding: 1rem; border-radius: 12px; border: 1px solid var(--border-color);">
+                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.45rem;">
+                    <span style="color: var(--text-secondary);">Host Storage</span>
+                    <strong class="mono" style="color: #34d399;">{{ h_disk | round(1) }}%</strong>
+                </div>
+                <div class="progress">
+                    <div class="progress-bar warning" style="width: {{ h_disk }}%;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-bolt"></i> Quick Provisioning</h3>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;">
+            <a href="{{ url_for('admin_vps_create') }}" class="btn btn-primary btn-sm">
+                <i class="fas fa-plus"></i> Deploy VPS
+            </a>
+            <a href="{{ url_for('admin_users_create') }}" class="btn btn-outline btn-sm">
+                <i class="fas fa-user-plus"></i> New User
+            </a>
+            <a href="{{ url_for('admin_node_create') }}" class="btn btn-outline btn-sm">
+                <i class="fas fa-server"></i> Add Node
+            </a>
+            <a href="{{ url_for('admin_api') }}" class="btn btn-outline btn-sm">
+                <i class="fas fa-key"></i> API Keys
+            </a>
+            <a href="{{ url_for('admin_settings') }}" class="btn btn-outline btn-sm">
+                <i class="fas fa-sliders"></i> Settings
+            </a>
+            <a href="{{ url_for('admin_backup_list') }}" class="btn btn-outline btn-sm">
+                <i class="fas fa-database"></i> Backups
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Cluster Nodes & Recent Audit Activity -->
+<div class="grid grid-2" style="margin-bottom: 1.4rem;">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-circle-nodes"></i> Cluster Node Health</h3>
+            <a href="{{ url_for('admin_nodes') }}" class="btn btn-outline btn-xs">Manage Nodes</a>
+        </div>
+        {% if node_status %}
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Node</th>
+                        <th>Location</th>
+                        <th>Capacity</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for n in node_status %}
+                    <tr>
+                        <td style="font-weight: 700;">{{ n.name }}</td>
+                        <td>{{ n.location or 'Default' }}</td>
+                        <td class="mono">{{ n.vps_count | default(0) }} / {{ n.total_vps | default(50) }}</td>
+                        <td>
+                            <span class="badge badge-{{ 'success' if n.online else 'danger' }}">
+                                {{ 'ONLINE' if n.online else 'OFFLINE' }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state" style="padding: 1.5rem;"><p>No nodes registered.</p></div>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-clock-rotate-left"></i> Recent Audit Activity</h3>
+            <a href="{{ url_for('admin_logs') }}" class="btn btn-outline btn-xs">Full Logs</a>
+        </div>
+        {% if recent_activity %}
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Action</th>
+                        <th>Details</th>
+                        <th>When</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for act in recent_activity[:6] %}
+                    <tr>
+                        <td style="font-weight: 600;">{{ act.username or 'System' }}</td>
+                        <td><span class="badge badge-info">{{ act.action }}</span></td>
+                        <td style="font-size: 0.78rem; color: var(--text-secondary);">{{ act.details or '-' }}</td>
+                        <td style="font-size: 0.76rem; color: var(--text-muted);">{{ act.timestamp | timeago }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state" style="padding: 1.5rem;"><p>No recent activity recorded.</p></div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

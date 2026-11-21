@@ -1,0 +1,99 @@
+{% extends "admin-base.html" %}
+
+{% block title %}System Maintenance · {{ panel_name | default('ZK-VPS-PANEL') }}{% endblock %}
+{% block header_title %}Platform Maintenance & Emergency Operations{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumb">
+    <a href="{{ url_for('admin_dashboard') }}" class="breadcrumb-item">Admin</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <span class="breadcrumb-item active">Maintenance</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-3" style="margin-bottom: 1.5rem;">
+    <div class="card">
+        <div class="stat-icon primary" style="margin-bottom: 1rem;"><i class="fas fa-database"></i></div>
+        <h3 style="font-size: 1.05rem; margin-bottom: 0.45rem;">Optimize SQLite Database</h3>
+        <p style="font-size: 0.84rem; color: var(--text-secondary); margin-bottom: 1.25rem;">
+            Run SQLite VACUUM and WAL checkpointing to reclaim unused disk pages and optimize query performance.
+        </p>
+        <button type="button" class="btn btn-primary btn-block" onclick="runMaintAction('/admin/vacuum', 'Optimize database?')">
+            <i class="fas fa-wand-magic-sparkles"></i> Vacuum Database
+        </button>
+    </div>
+
+    <div class="card">
+        <div class="stat-icon info" style="margin-bottom: 1rem;"><i class="fas fa-gauge-high"></i></div>
+        <h3 style="font-size: 1.05rem; margin-bottom: 0.45rem;">Force Resource Check</h3>
+        <p style="font-size: 0.84rem; color: var(--text-secondary); margin-bottom: 1.25rem;">
+            Trigger an immediate cluster-wide CPU, RAM, and expiration check across all running virtual servers.
+        </p>
+        <button type="button" class="btn btn-outline btn-block" onclick="runMaintAction('/admin/resource-check', 'Run cluster resource check now?')">
+            <i class="fas fa-bolt"></i> Run Resource Audit
+        </button>
+    </div>
+
+    <div class="card">
+        <div class="stat-icon success" style="margin-bottom: 1rem;"><i class="fas fa-unlock"></i></div>
+        <h3 style="font-size: 1.05rem; margin-bottom: 0.45rem;">Clear All Suspensions</h3>
+        <p style="font-size: 0.84rem; color: var(--text-secondary); margin-bottom: 1.25rem;">
+            Unsuspend all currently suspended virtual servers and resume normal container operations.
+        </p>
+        <button type="button" class="btn btn-success btn-block" onclick="runMaintAction('/admin/clear-suspensions', 'Unsuspend all suspended servers?')">
+            <i class="fas fa-check-circle"></i> Clear Suspensions
+        </button>
+    </div>
+</div>
+
+<div class="card" style="border-color: rgba(239, 68, 68, 0.35);">
+    <div class="card-header">
+        <h3 class="card-title" style="color: #fca5a5;"><i class="fas fa-triangle-exclamation" style="color: #ef4444;"></i> Emergency Cluster Controls</h3>
+    </div>
+    <div class="grid grid-3">
+        <div>
+            <h4 style="font-size: 0.92rem; margin-bottom: 0.3rem;">Reset Port Forwards</h4>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Remove all NAT port forwards across the cluster.</p>
+            <button type="button" class="btn btn-warning btn-sm" onclick="runMaintAction('/admin/reset-ports', 'WARNING: Reset all port forwards?')">
+                <i class="fas fa-network-wired"></i> Reset Ports
+            </button>
+        </div>
+        <div>
+            <h4 style="font-size: 0.92rem; margin-bottom: 0.3rem;">Emergency Reboot All VPS</h4>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Restart every running container across all nodes.</p>
+            <button type="button" class="btn btn-warning btn-sm" onclick="runMaintAction('/admin/emergency-reboot-all', 'WARNING: Reboot ALL virtual servers?')">
+                <i class="fas fa-rotate"></i> Reboot All Servers
+            </button>
+        </div>
+        <div>
+            <h4 style="font-size: 0.92rem; margin-bottom: 0.3rem;">Emergency Stop All VPS</h4>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Immediately halt all running containers.</p>
+            <button type="button" class="btn btn-danger btn-sm" onclick="runMaintAction('/admin/emergency-stop-all', 'DANGER: Stop ALL running virtual servers?')">
+                <i class="fas fa-power-off"></i> Stop All Servers
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+function runMaintAction(endpoint, confirmMsg) {
+    if (!confirm(confirmMsg)) return;
+    showLoading();
+    fetch(endpoint, { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+            hideLoading();
+            if (d.success) {
+                showToast(d.message || 'Maintenance operation completed', 'success');
+            } else {
+                showToast(d.error || 'Operation failed', 'danger');
+            }
+        })
+        .catch(() => {
+            hideLoading();
+            showToast('Operation completed', 'info');
+        });
+}
+</script>
+{% endblock %}

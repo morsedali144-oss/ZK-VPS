@@ -1,0 +1,105 @@
+{% extends "admin-base.html" %}
+
+{% block title %}Panel Settings · {{ panel_name | default('ZK-VPS-PANEL') }}{% endblock %}
+{% block header_title %}Platform Configuration & Thresholds{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumb">
+    <a href="{{ url_for('admin_dashboard') }}" class="breadcrumb-item">Admin</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <span class="breadcrumb-item active">Settings</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 920px; margin: 0 auto;">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-sliders"></i> Global Panel Settings</h3>
+    </div>
+
+    <form method="POST" action="{{ url_for('admin_settings') }}">
+        <div class="grid grid-2">
+            <div class="form-group">
+                <label class="form-label">Panel Brand Name</label>
+                <input type="text" name="site_name" class="form-control" value="{{ settings.get('site_name', 'ZK-VPS-PANEL') }}">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Footer Brand Text</label>
+                <input type="text" name="footer_text" class="form-control" value="{{ settings.get('footer_text', 'ZK-VPS-PANEL') }}">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Platform Description</label>
+            <input type="text" name="site_description" class="form-control" value="{{ settings.get('site_description', '') }}">
+        </div>
+
+        <div class="grid grid-2">
+            <div class="form-group">
+                <label class="form-label">Header Logo Path</label>
+                <input type="text" name="header_icon" class="form-control" value="{{ settings.get('header_icon', '/static/img/logo.png') }}">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Favicon Path</label>
+                <input type="text" name="favicon" class="form-control" value="{{ settings.get('favicon', '/static/img/favicon.ico') }}">
+            </div>
+        </div>
+
+        <div class="grid grid-4">
+            <div class="form-group">
+                <label class="form-label">CPU Auto-Suspend (%)</label>
+                <input type="number" name="cpu_threshold" class="form-control" value="{{ settings.get('cpu_threshold', '90') }}">
+            </div>
+            <div class="form-group">
+                <label class="form-label">RAM Auto-Suspend (%)</label>
+                <input type="number" name="ram_threshold" class="form-control" value="{{ settings.get('ram_threshold', '90') }}">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Default Port Quota</label>
+                <input type="number" name="default_port_quota" class="form-control" value="{{ settings.get('default_port_quota', '5') }}">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Max VPS Per User</label>
+                <input type="number" name="max_vps_per_user" class="form-control" value="{{ settings.get('max_vps_per_user', '10') }}">
+            </div>
+        </div>
+
+        <div class="grid grid-2">
+            <div class="form-group">
+                <label class="form-label">Session Timeout (sec)</label>
+                <input type="number" name="session_timeout" class="form-control" value="{{ settings.get('session_timeout', '3600') }}">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Backup Retention (days)</label>
+                <input type="number" name="backup_retention" class="form-control" value="{{ settings.get('backup_retention', '7') }}">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Maintenance Banner Message</label>
+            <input type="text" name="maintenance_message" class="form-control" value="{{ settings.get('maintenance_message', 'Site is under maintenance.') }}">
+        </div>
+
+        <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; margin: 1.25rem 0;">
+            <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                <input type="checkbox" name="registration_enabled" {% if settings.get('registration_enabled', '1') == '1' %}checked{% endif %} style="accent-color: var(--blue-500); width: 16px; height: 16px;">
+                <span>Enable Public User Registration</span>
+            </label>
+            <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                <input type="checkbox" name="maintenance_mode" {% if settings.get('maintenance_mode', '0') == '1' %}checked{% endif %} style="accent-color: var(--blue-500); width: 16px; height: 16px;">
+                <span>Enable Maintenance Mode</span>
+            </label>
+            <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                <input type="checkbox" name="backup_enabled" {% if settings.get('backup_enabled', '1') == '1' %}checked{% endif %} style="accent-color: var(--blue-500); width: 16px; height: 16px;">
+                <span>Enable Automated Backups</span>
+            </label>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
+            <button type="submit" class="btn btn-primary btn-lg">
+                <i class="fas fa-floppy-disk"></i> Save Platform Settings
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

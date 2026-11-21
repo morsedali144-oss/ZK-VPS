@@ -1,0 +1,120 @@
+{% extends "admin-base.html" %}
+
+{% block title %}Users & Quotas · {{ panel_name | default('ZK-VPS-PANEL') }}{% endblock %}
+{% block header_title %}User Accounts & Resource Quotas{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumb">
+    <a href="{{ url_for('admin_dashboard') }}" class="breadcrumb-item">Admin</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <span class="breadcrumb-item active">Users</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-users"></i> Registered Cloud Accounts ({{ users | length }})</h3>
+        <div style="display: flex; gap: 0.65rem; align-items: center;">
+            <input type="text" id="userSearchInput" class="form-control" placeholder="Search username or email..." style="width: 240px; padding: 0.42rem 0.75rem; font-size: 0.82rem;">
+            <a href="{{ url_for('admin_users_create') }}" class="btn btn-primary btn-sm">
+                <i class="fas fa-user-plus"></i> Create User
+            </a>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>User</th>
+                    <th>Role</th>
+                    <th>VPS Count</th>
+                    <th>NAT Ports</th>
+                    <th>Created</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr class="user-row" data-search="{{ u.username | lower }} {{ u.email | lower }}">
+                    <td class="mono">#{{ u.id }}</td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 0.7rem;">
+                            <div class="user-avatar" style="width: 34px; height: 34px; font-size: 0.82rem;">
+                                {{ u.username[:1].upper() }}
+                            </div>
+                            <div>
+                                <a href="{{ url_for('admin_user_detail', user_id=u.id) }}" style="font-weight: 700; color: #fff;">
+                                    {{ u.username }}
+                                </a>
+                                <div style="font-size: 0.75rem; color: var(--text-muted);">{{ u.email }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        {% if u.is_main_admin %}
+                        <span class="badge badge-danger"><i class="fas fa-crown"></i> Root Admin</span>
+                        {% elif u.is_admin %}
+                        <span class="badge badge-primary"><i class="fas fa-shield-halved"></i> Admin</span>
+                        {% else %}
+                        <span class="badge badge-secondary">Client</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge badge-info">{{ u.vps_count | default(0) }} VPS</span>
+                    </td>
+                    <td class="mono">
+                        {{ u.used_ports | default(0) }} / {{ u.allocated_ports | default(u.port_quota) | default(0) }}
+                    </td>
+                    <td style="font-size: 0.78rem; color: var(--text-muted);">
+                        {{ (u.last_active or u.created_at) | timeago }}
+                    </td>
+                    <td style="text-align: right;">
+                        <div style="display: inline-flex; gap: 0.35rem;">
+                            <a href="{{ url_for('admin_user_detail', user_id=u.id) }}" class="btn btn-outline btn-xs" title="View User">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            <a href="{{ url_for('admin_user_edit', user_id=u.id) }}" class="btn btn-outline btn-xs" title="Edit User">
+                                <i class="fas fa-pen"></i>
+                            </a>
+                            {% if not u.is_main_admin and u.id != current_user.id %}
+                            <button type="button" class="btn btn-danger btn-xs" onclick="deleteUserAccount({{ u.id }}, '{{ u.username }}')" title="Delete User">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+document.getElementById('userSearchInput')?.addEventListener('input', function() {
+    const q = this.value.toLowerCase().trim();
+    document.querySelectorAll('.user-row').forEach(r => {
+        r.style.display = r.dataset.search.includes(q) ? '' : 'none';
+    });
+});
+
+function deleteUserAccount(userId, username) {
+    if (!confirm(`Delete user "${username}" (#${userId}) and all owned virtual servers?`)) return;
+    showLoading();
+    fetch(`/admin/users/${userId}/delete`, { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+            hideLoading();
+            if (d.success) {
+                showToast('User deleted', 'success');
+                setTimeout(() => location.reload(), 700);
+            } else {
+                showToast(d.error || 'Delete failed', 'danger');
+            }
+        });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Sign In · {{ panel_name | default('ZK-VPS-PANEL') }}{% endblock %}
+{% block header_title %}Sign In{% endblock %}
+
+{% block content %}
+<div style="min-height: calc(100vh - 210px); display: flex; align-items: center; justify-content: center; padding: 1.5rem 0;">
+    <div class="card" style="width: 100%; max-width: 440px; padding: 2.25rem; border-color: rgba(59, 130, 246, 0.28); background: linear-gradient(180deg, rgba(13, 24, 48, 0.94) 0%, rgba(8, 15, 31, 0.97) 100%);">
+        <div style="text-align: center; margin-bottom: 1.85rem;">
+            <div class="brand-emblem" style="width: 54px; height: 54px; font-size: 1.3rem; border-radius: 14px; margin: 0 auto 1rem;">
+                <span>ZK</span>
+            </div>
+            <h2 style="font-size: 1.45rem; font-weight: 800; margin-bottom: 0.35rem;">Welcome Back</h2>
+            <p style="font-size: 0.86rem; color: var(--text-secondary);">Sign in to manage your {{ panel_name | default('ZK-VPS-PANEL') }} infrastructure</p>
+        </div>
+
+        {% if error %}
+        <div class="alert alert-danger" style="margin-bottom: 1.25rem;">
+            <i class="fas fa-circle-exclamation"></i>
+            <span>{{ error }}</span>
+        </div>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('login') }}">
+            <div class="form-group">
+                <label class="form-label" for="username">Username or Email</label>
+                <div style="position: relative;">
+                    <i class="fas fa-user" style="position: absolute; left: 0.95rem; top: 50%; transform: translateY(-50%); color: var(--blue-400); font-size: 0.85rem;"></i>
+                    <input type="text" id="username" name="username" class="form-control" style="padding-left: 2.5rem;" placeholder="Enter your username" required autofocus>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="password">Password</label>
+                <div style="position: relative;">
+                    <i class="fas fa-lock" style="position: absolute; left: 0.95rem; top: 50%; transform: translateY(-50%); color: var(--blue-400); font-size: 0.85rem;"></i>
+                    <input type="password" id="password" name="password" class="form-control" style="padding-left: 2.5rem; padding-right: 2.6rem;" placeholder="Enter your password" required>
+                    <button type="button" onclick="togglePassVisibility('password', this)" style="position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-muted); cursor: pointer;">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.4rem; font-size: 0.82rem;">
+                <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; color: var(--text-secondary);">
+                    <input type="checkbox" name="remember" style="accent-color: var(--blue-500); width: 15px; height: 15px;">
+                    <span>Keep me signed in</span>
+                </label>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block btn-lg">
+                <i class="fas fa-right-to-bracket"></i>
+                <span>Sign In to Console</span>
+            </button>
+        </form>
+
+        {% if get_setting('registration_enabled', '1') == '1' %}
+        <div style="margin-top: 1.5rem; padding-top: 1.2rem; border-top: 1px solid var(--border-color); text-align: center; font-size: 0.84rem; color: var(--text-secondary);">
+            Don't have an account yet?
+            <a href="{{ url_for('register') }}" style="font-weight: 600; color: var(--cyan-400);">Create an account</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function togglePassVisibility(inputId, btn) {
+    const input = document.getElementById(inputId);
+    const icon = btn.querySelector('i');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.className = 'fas fa-eye-slash';
+    } else {
+        input.type = 'password';
+        icon.className = 'fas fa-eye';
+    }
+}
+</script>
+{% endblock %}

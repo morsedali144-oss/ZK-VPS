@@ -1,0 +1,45 @@
+{% extends "admin-base.html" %}
+
+{% block title %}Audit & System Logs · {{ panel_name | default('ZK-VPS-PANEL') }}{% endblock %}
+{% block header_title %}Audit Trail & System Logs{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumb">
+    <a href="{{ url_for('admin_dashboard') }}" class="breadcrumb-item">Admin</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <span class="breadcrumb-item active">System Logs</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-terminal"></i> Application & Security Log Viewer</h3>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            {% if available_logs %}
+            {% for lg in available_logs %}
+            {% set lg_name = lg.name if lg is mapping else lg %}
+            <a href="{{ url_for('admin_logs') }}?log={{ lg_name }}" class="btn btn-{{ 'primary' if current_log and current_log.name == lg_name else 'outline' }} btn-sm">
+                <i class="fas fa-file-lines"></i> {{ lg_name }}
+            </a>
+            {% endfor %}
+            {% endif %}
+            <button type="button" class="btn btn-outline btn-sm" onclick="location.reload()">
+                <i class="fas fa-rotate"></i> Refresh
+            </button>
+        </div>
+    </div>
+
+    {% if current_log and current_log.content %}
+    <pre class="mono" style="background: #030712; color: #93c5fd; padding: 1.2rem; border-radius: 12px; border: 1px solid var(--border-color); max-height: 540px; overflow: auto; font-size: 0.78rem; line-height: 1.55;">{{ current_log.content }}</pre>
+    {% elif logs %}
+    <pre class="mono" style="background: #030712; color: #93c5fd; padding: 1.2rem; border-radius: 12px; border: 1px solid var(--border-color); max-height: 540px; overflow: auto; font-size: 0.78rem; line-height: 1.55;">{% for line in logs %}{{ line }}{% endfor %}</pre>
+    {% else %}
+    <div class="empty-state">
+        <i class="fas fa-file-code"></i>
+        <h3>Log Stream Ready</h3>
+        <p>Select a log file above or refresh to inspect system output.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Server Suspended · {{ panel_name | default('ZK-VPS-PANEL') }}{% endblock %}
+{% block header_title %}Server Suspended{% endblock %}
+{% block content %}
+<div style="min-height: 65vh; display: flex; align-items: center; justify-content: center;">
+    <div class="card" style="max-width: 540px; width: 100%; text-align: center; padding: 2.8rem 2rem;">
+        <div class="stat-icon danger" style="width: 64px; height: 64px; margin: 0 auto 1.25rem; font-size: 1.7rem;">
+            <i class="fas fa-ban"></i>
+        </div>
+        <h2 style="font-size: 1.5rem; font-weight: 800; margin-bottom: 0.5rem;">Instance Suspended</h2>
+        <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+            Virtual server <strong>{{ vps.hostname or vps.container_name }}</strong> has been suspended.
+        </p>
+        <div class="alert alert-danger" style="justify-content: center;">
+            <span>Reason: {{ vps.suspended_reason or vps.suspension_reason or 'Administrative or resource threshold suspension' }}</span>
+        </div>
+        <a href="{{ url_for('vps_list') }}" class="btn btn-primary" style="margin-top: 0.75rem;">
+            <i class="fas fa-arrow-left"></i> Return to My Servers
+        </a>
+    </div>
+</div>
+{% endblock %}

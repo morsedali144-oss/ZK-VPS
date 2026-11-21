@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Account Profile · {{ panel_name | default('ZK-VPS-PANEL') }}{% endblock %}
+{% block header_title %}Account & Security Settings{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumb">
+    <a href="{{ url_for('dashboard') }}" class="breadcrumb-item">Home</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <span class="breadcrumb-item active">My Profile</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-3">
+    <!-- Left Column: Identity Card -->
+    <div class="card" style="text-align: center;">
+        <div class="user-avatar" style="width: 84px; height: 84px; font-size: 2rem; border-radius: 22px; margin: 0 auto 1rem;">
+            {% if current_user.profile_picture %}
+            <img src="{{ current_user.profile_picture }}" alt="{{ current_user.username }}">
+            {% else %}
+            <span>{{ current_user.username[:1].upper() }}</span>
+            {% endif %}
+        </div>
+        <h3 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 0.2rem;">{{ current_user.username }}</h3>
+        <p style="font-size: 0.84rem; color: var(--text-secondary); margin-bottom: 0.85rem;">{{ current_user.email }}</p>
+        <div style="display: flex; justify-content: center; gap: 0.45rem; margin-bottom: 1.5rem;">
+            {% if current_user.is_main_admin %}
+            <span class="badge badge-danger"><i class="fas fa-crown"></i> Main Admin</span>
+            {% elif current_user.is_admin %}
+            <span class="badge badge-primary"><i class="fas fa-shield-halved"></i> Administrator</span>
+            {% else %}
+            <span class="badge badge-info"><i class="fas fa-cloud"></i> Cloud User</span>
+            {% endif %}
+        </div>
+
+        <form method="POST" action="{{ url_for('profile') }}" enctype="multipart/form-data" style="text-align: left; border-top: 1px solid var(--border-color); padding-top: 1.15rem;">
+            <input type="hidden" name="action" value="upload_picture">
+            <label class="form-label">Update Avatar Image</label>
+            <input type="file" name="profile_picture" class="form-control" accept="image/*" style="margin-bottom: 0.75rem; font-size: 0.78rem;">
+            <button type="submit" class="btn btn-outline btn-sm btn-block">
+                <i class="fas fa-upload"></i> Upload New Avatar
+            </button>
+        </form>
+    </div>
+
+    <!-- Right Column: Profile Details, Password & API Key -->
+    <div style="grid-column: span 2; display: flex; flex-direction: column; gap: 1.25rem;">
+        <!-- General Info -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-id-card"></i> Profile Information</h3>
+            </div>
+            <form method="POST" action="{{ url_for('profile') }}">
+                <input type="hidden" name="action" value="update_profile">
+                <div class="grid grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Username</label>
+                        <input type="text" class="form-control" value="{{ current_user.username }}" disabled>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Email Address</label>
+                        <input type="email" name="email" class="form-control" value="{{ current_user.email }}" required>
+                    </div>
+                </div>
+                <input type="hidden" name="theme" value="dark">
+                <input type="hidden" name="language" value="{{ current_user.language or 'en' }}">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-floppy-disk"></i> Save Changes
+                </button>
+            </form>
+        </div>
+
+        <!-- Change Password -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-key"></i> Change Account Password</h3>
+            </div>
+            <form method="POST" action="{{ url_for('profile') }}">
+                <input type="hidden" name="action" value="change_password">
+                <div class="form-group">
+                    <label class="form-label">Current Password</label>
+                    <input type="password" name="current_password" class="form-control" required>
+                </div>
+                <div class="grid grid-2">
+                    <div class="form-group">
+                        <label class="form-label">New Password</label>
+                        <input type="password" name="new_password" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Confirm New Password</label>
+                        <input type="password" name="confirm_password" class="form-control" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-lock"></i> Update Password
+                </button>
+            </form>
+        </div>
+
+        <!-- Personal API Key -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-code"></i> Personal Developer API Token</h3>
+            </div>
+            <div style="display: flex; gap: 0.65rem; align-items: center; margin-bottom: 1rem;">
+                <input type="text" id="personalApiKeyInput" class="form-control mono" value="{{ current_user.api_key or 'No API key generated' }}" readonly>
+                {% if current_user.api_key %}
+                <button type="button" class="btn btn-outline" onclick="copyToClipboard('personalApiKeyInput')">
+                    <i class="fas fa-copy"></i> Copy
+                </button>
+                {% endif %}
+            </div>
+            <form method="POST" action="{{ url_for('profile') }}">
+                <input type="hidden" name="action" value="generate_api_key">
+                <button type="submit" class="btn btn-outline btn-sm">
+                    <i class="fas fa-rotate"></i> Generate / Rotate API Token
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

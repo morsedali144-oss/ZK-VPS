@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+
+{% block title %}SFTP File Manager · {{ vps.hostname or vps.container_name }} · {{ panel_name | default('ZK-VPS-PANEL') }}{% endblock %}
+{% block header_title %}SFTP File Manager · {{ vps.hostname or vps.container_name }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumb">
+    <a href="{{ url_for('dashboard') }}" class="breadcrumb-item">Home</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <a href="{{ url_for('vps_detail', vps_id=vps.id) }}" class="breadcrumb-item">{{ vps.hostname or vps.container_name }}</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <span class="breadcrumb-item active">SFTP File Explorer</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <!-- Top Path & Action Bar -->
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.25rem; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 260px;">
+            <button type="button" class="btn btn-outline btn-sm" onclick="navigateUp()" title="Up Directory">
+                <i class="fas fa-level-up-alt"></i>
+            </button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="browsePath('/root')" title="Home (/root)">
+                <i class="fas fa-house"></i>
+            </button>
+            <input type="text" id="currentPathInput" class="form-control mono" value="/root" style="font-size: 0.84rem;" onkeydown="if(event.key==='Enter') browsePath(this.value)">
+            <button type="button" class="btn btn-primary btn-sm" onclick="browsePath(document.getElementById('currentPathInput').value)">
+                Go
+            </button>
+        </div>
+
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button type="button" class="btn btn-outline btn-sm" onclick="showModal('mkdirModal')">
+                <i class="fas fa-folder-plus"></i> New Folder
+            </button>
+            <label class="btn btn-primary btn-sm" style="margin: 0; cursor: pointer;">
+                <i class="fas fa-cloud-arrow-up"></i> Upload File
+                <input type="file" id="fileUploadInput" style="display: none;" onchange="uploadSelectedFile(this)">
+            </label>
+            <button type="button" class="btn btn-outline btn-sm" onclick="browsePath(currentPath)">
+                <i class="fas fa-rotate"></i> Refresh
+            </button>
+            <a href="{{ url_for('vps_detail', vps_id=vps.id) }}" class="btn btn-outline btn-sm">
+                <i class="fas fa-arrow-left"></i> Server Details
+            </a>
+        </div>
+    </div>
+
+    <!-- File Listing Table -->
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Permissions</th>
+                    <th>Owner</th>
+                    <th>Size</th>
+                    <th>Modified</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="fileTableBody">
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 2.5rem; color: var(--text-secondary);">
+                        <i class="fas fa-spinner fa-spin" style="color: var(--blue-400); margin-right: 0.5rem;"></i> Connecting to container SFTP...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- New Folder Modal -->
+<div class="modal" id="mkdirModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-folder-plus" style="color: var(--blue-400);"></i> Create Directory</h3>
+            <button type="button" class="modal-close" onclick="hideModal('mkdirModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Folder Name</label>
+                <input type="text" id="newFolderName" class="form-control" placeholder="e.g. configs">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline" onclick="hideModal('mkdirModal')">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="submitMkdir()">Create</button>
+        </div>
+    </div>
+</div>
+
+<!-- Rename Modal -->
+<div class="modal" id="renameModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-pen" style="color: var(--cyan-400);"></i> Rename Item</h3>
+            <button type="button" class="modal-close" onclick="hideModal('renameModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="renameOldPath">
+            <div class="form-group">
+                <label class="form-label">New Name</label>
+                <input type="text" id="renameNewName" class="form-control">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline" onclick="hideModal('renameModal')">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="submitRename()">Save Name</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const vpsId = {{ vps.id }};
+let currentPath = '/root';
+
+function joinPath(base, name) {
+    if (base === '/') return '/' + name;
+    return base.replace(/\/+$/, '') + '/' + name;
+}
+
+function navigateUp() {
+    if (currentPath === '/' || !currentPath) return;
+    const parts = currentPath.split('/').filter(Boolean);
+    parts.pop();
+    browsePath('/' + parts.join('/'));
+}
+
+function browsePath(path) {
+    const target = path || '/';
+    const tbody = document.getElementById('fileTableBody');
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading ${target}...</td></tr>`;
+
+    fetch(`/vps/${vpsId}/files/browse`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: target })
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (!d.success) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:2rem;color:#fca5a5;"><i class="fas fa-circle-exclamation"></i> ${d.error || 'Unable to browse SFTP directory'}</td></tr>`;
+            return;
+        }
+        currentPath = d.path || target;
+        document.getElementById('currentPathInput').value = currentPath;
+
+        if (!d.files || d.files.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--text-muted);">Directory is empty</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = d.files.map(f => {
+            const fullPath = joinPath(currentPath, f.name);
+            const icon = f.is_dir ? 'fa-folder" style="color:#38bdf8;' : 'fa-file-code" style="color:#94a3b8;';
+            return `
+                <tr>
+                    <td>
+                        <div style="display:flex;align-items:center;gap:0.65rem;">
+                            <i class="fas ${icon}"></i>
+                            ${f.is_dir
+                                ? `<a href="#" onclick="browsePath('${fullPath.replace(/'/g, "\\'")}');return false;" style="font-weight:600;color:#fff;">${f.name}</a>`
+                                : `<span class="mono">${f.name}</span>`
+                            }
+                        </div>
+                    </td>
+                    <td class="mono" style="font-size:0.78rem;color:var(--text-secondary);">${f.permissions || '-'}</td>
+                    <td style="font-size:0.8rem;">${f.owner || 'root'}</td>
+                    <td class="mono" style="font-size:0.8rem;">${f.is_dir ? '-' : formatBytes(f.size)}</td>
+                    <td style="font-size:0.78rem;color:var(--text-muted);">${f.modified ? new Date(f.modified).toLocaleString() : '-'}</td>
+                    <td style="text-align:right;">
+                        <div style="display:inline-flex;gap:0.35rem;">
+                            ${!f.is_dir ? `<button class="btn btn-outline btn-xs" onclick="downloadFile('${fullPath.replace(/'/g, "\\'")}')" title="Download"><i class="fas fa-download"></i></button>` : ''}
+                            <button class="btn btn-outline btn-xs" onclick="openRenameModal('${fullPath.replace(/'/g, "\\'")}', '${f.name.replace(/'/g, "\\'")}')" title="Rename"><i class="fas fa-pen"></i></button>
+                            <button class="btn btn-danger btn-xs" onclick="deleteItem('${fullPath.replace(/'/g, "\\'")}', ${f.is_dir})" title="Delete"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    })
+    .catch(() => {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:2rem;color:#fca5a5;">Connection error while listing files. Ensure the VPS is running and SSH is configured.</td></tr>`;
+    });
+}
+
+function submitMkdir() {
+    const name = document.getElementById('newFolderName').value.trim();
+    if (!name) return;
+    fetch(`/vps/${vpsId}/files/mkdir`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: currentPath, name })
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.success) {
+            hideModal('mkdirModal');
+            document.getElementById('newFolderName').value = '';
+            showToast('Directory created', 'success');
+            browsePath(currentPath);
+        } else {
+            showToast(d.error || 'Failed to create directory', 'danger');
+        }
+    });
+}
+
+function openRenameModal(oldPath, currentName) {
+    document.getElementById('renameOldPath').value = oldPath;
+    document.getElementById('renameNewName').value = currentName;
+    showModal('renameModal');
+}
+
+function submitRename() {
+    const old_path = document.getElementById('renameOldPath').value;
+    const new_name = document.getElementById('renameNewName').value.trim();
+    if (!new_name) return;
+    fetch(`/vps/${vpsId}/files/rename`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ old_path, new_name })
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.success) {
+            hideModal('renameModal');
+            showToast('Item renamed', 'success');
+            browsePath(currentPath);
+        } else {
+            showToast(d.error || 'Rename failed', 'danger');
+        }
+    });
+}
+
+function deleteItem(path, is_dir) {
+    if (!confirm(`Delete ${path}?`)) return;
+    fetch(`/vps/${vpsId}/files/delete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path, is_dir })
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.success) {
+            showToast('Deleted successfully', 'success');
+            browsePath(currentPath);
+        } else {
+            showToast(d.error || 'Delete failed', 'danger');
+        }
+    });
+}
+
+function uploadSelectedFile(input) {
+    if (!input.files || !input.files[0]) return;
+    const fd = new FormData();
+    fd.append('file', input.files[0]);
+    fd.append('path', currentPath);
+    showLoading();
+    fetch(`/vps/${vpsId}/files/upload`, {
+        method: 'POST',
+        body: fd
+    })
+    .then(r => r.json())
+    .then(d => {
+        hideLoading();
+        input.value = '';
+        if (d.success) {
+            showToast('File uploaded', 'success');
+            browsePath(currentPath);
+        } else {
+            showToast(d.error || 'Upload failed', 'danger');
+        }
+    })
+    .catch(() => { hideLoading(); showToast('Upload failed', 'danger'); });
+}
+
+function downloadFile(path) {
+    fetch(`/vps/${vpsId}/files/download`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path })
+    })
+    .then(res => {
+        if (!res.ok) throw new Error('Download failed');
+        return res.blob();
+    })
+    .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = path.split('/').pop();
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    })
+    .catch(() => showToast('Download failed', 'danger'));
+}
+
+document.addEventListener('DOMContentLoaded', () => browsePath('/root'));
+</script>
+{% endblock %}

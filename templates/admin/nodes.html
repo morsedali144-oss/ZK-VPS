@@ -1,0 +1,129 @@
+{% extends "admin-base.html" %}
+
+{% block title %}Cluster Nodes · {{ panel_name | default('ZK-VPS-PANEL') }}{% endblock %}
+{% block header_title %}LXD Cluster Nodes{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumb">
+    <a href="{{ url_for('admin_dashboard') }}" class="breadcrumb-item">Admin</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <span class="breadcrumb-item active">Cluster Nodes</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-circle-nodes"></i> Registered Compute Nodes ({{ nodes | length }})</h3>
+        <a href="{{ url_for('admin_node_create') }}" class="btn btn-primary btn-sm">
+            <i class="fas fa-plus"></i> Add Cluster Node
+        </a>
+    </div>
+
+    {% if nodes %}
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Node Name</th>
+                    <th>Type</th>
+                    <th>Location</th>
+                    <th>Endpoint / IP</th>
+                    <th>VPS Capacity</th>
+                    <th>Status</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for n in nodes %}
+                <tr>
+                    <td>
+                        <a href="{{ url_for('admin_node_view', node_id=n.id) }}" style="font-weight: 700; color: #fff;">
+                            {{ n.name }}
+                        </a>
+                    </td>
+                    <td>
+                        {% if n.is_local %}
+                        <span class="badge badge-primary">Local Host</span>
+                        {% else %}
+                        <span class="badge badge-info">Remote Agent</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ n.location or 'Default DC' }}</td>
+                    <td class="mono" style="font-size: 0.8rem;">{{ n.url or n.ip_address or '127.0.0.1' }}</td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 0.65rem;">
+                            <div class="progress" style="width: 90px;">
+                                {% set cap_pct = ((n.actual_vps or n.used_vps or 0) * 100 / (n.total_vps or 50)) | round(0) %}
+                                <div class="progress-bar info" style="width: {{ cap_pct }}%;"></div>
+                            </div>
+                            <span class="mono" style="font-size: 0.78rem;">{{ n.actual_vps or n.used_vps or 0 }} / {{ n.total_vps }}</span>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="status-indicator">
+                            <span class="status-dot {{ 'running' if n.status == 'active' else 'stopped' }}"></span>
+                            <span>{{ (n.status or 'active') | upper }}</span>
+                        </span>
+                    </td>
+                    <td style="text-align: right;">
+                        <div style="display: inline-flex; gap: 0.35rem;">
+                            <a href="{{ url_for('admin_node_view', node_id=n.id) }}" class="btn btn-outline btn-xs" title="Node Telemetry">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            <a href="{{ url_for('admin_node_edit', node_id=n.id) }}" class="btn btn-outline btn-xs" title="Edit Node">
+                                <i class="fas fa-pen"></i>
+                            </a>
+                            <button type="button" class="btn btn-outline btn-xs" onclick="regenerateNodeKey({{ n.id }})" title="Rotate API Key">
+                                <i class="fas fa-key"></i>
+                            </button>
+                            {% if not n.is_local %}
+                            <button type="button" class="btn btn-danger btn-xs" onclick="deleteNode({{ n.id }}, '{{ n.name }}')" title="Delete Node">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="fas fa-circle-nodes"></i>
+        <h3>No Compute Nodes</h3>
+        <p>Add a local or remote LXD compute node to begin provisioning containers.</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function regenerateNodeKey(nodeId) {
+    if (!confirm('Regenerate API key for this node? Remote agents must be updated with the new key.')) return;
+    fetch(`/admin/nodes/${nodeId}/regenerate-key`, { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+            if (d.success) {
+                prompt('New Node API Key (copy now):', d.api_key);
+            } else {
+                showToast(d.error || 'Failed to rotate key', 'danger');
+            }
+        });
+}
+
+function deleteNode(nodeId, name) {
+    if (!confirm(`Delete node "${name}"?`)) return;
+    fetch(`/admin/nodes/${nodeId}/delete`, { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+            if (d.success) {
+                showToast('Node deleted', 'success');
+                setTimeout(() => location.reload(), 700);
+            } else {
+                showToast(d.error || 'Cannot delete node', 'danger');
+            }
+        });
+}
+</script>
+{% endblock %}
