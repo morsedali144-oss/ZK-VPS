@@ -1,0 +1,108 @@
+{% extends "admin-base.html" %}
+
+{% block title %}Node Telemetry · {{ node.name }} · {{ panel_name | default('ZK-VPS-PANEL') }}{% endblock %}
+{% block header_title %}Node Details · {{ node.name }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumb">
+    <a href="{{ url_for('admin_dashboard') }}" class="breadcrumb-item">Admin</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <a href="{{ url_for('admin_nodes') }}" class="breadcrumb-item">Nodes</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <span class="breadcrumb-item active">{{ node.name }}</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-4" style="margin-bottom: 1.4rem;">
+    <div class="stat-card">
+        <div class="stat-icon primary"><i class="fas fa-server"></i></div>
+        <div class="stat-content">
+            <div class="stat-label">{{ node.location or 'Datacenter' }}</div>
+            <div class="stat-value">{{ node.name }}</div>
+            <div class="stat-change">{{ 'Local Node' if node.is_local else node.url }}</div>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon info"><i class="fas fa-cubes"></i></div>
+        <div class="stat-content">
+            <div class="stat-label">Hosted Containers</div>
+            <div class="stat-value">{{ vps_count | default((vps_list or []) | length) }} / {{ node.total_vps }}</div>
+            <div class="stat-change">Pool: {{ node.storage_pool or 'default' }}</div>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon success"><i class="fas fa-microchip"></i></div>
+        <div class="stat-content">
+            <div class="stat-label">Node CPU Usage</div>
+            <div class="stat-value">{{ (stats.cpu | default(0)) | round(1) if stats and stats.cpu is defined else '0.0' }}%</div>
+            <div class="stat-change">Bridge: {{ node.network_bridge or 'lxdbr0' }}</div>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon warning"><i class="fas fa-key"></i></div>
+        <div class="stat-content">
+            <div class="stat-label">Agent Auth Token</div>
+            <div class="stat-value" style="font-size: 0.9rem;">
+                <code class="mono" id="nodeApiKeyText">{{ (node.api_key or '')[:14] }}...</code>
+            </div>
+            <div class="stat-change">
+                <a href="#" onclick="copyFullNodeKey(); return false;">Copy Full API Key</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-cubes"></i> Containers Hosted on {{ node.name }}</h3>
+        <a href="{{ url_for('admin_node_edit', node_id=node.id) }}" class="btn btn-outline btn-sm">
+            <i class="fas fa-pen"></i> Edit Node
+        </a>
+    </div>
+
+    {% if vps_list %}
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Hostname</th>
+                    <th>Owner</th>
+                    <th>Specs</th>
+                    <th>IP Address</th>
+                    <th>Status</th>
+                    <th style="text-align: right;">View</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for v in vps_list %}
+                <tr>
+                    <td class="mono">#{{ v.id }}</td>
+                    <td><a href="{{ url_for('vps_detail', vps_id=v.id) }}" style="font-weight: 700; color: #fff;">{{ v.hostname or v.container_name }}</a></td>
+                    <td>{{ v.username }}</td>
+                    <td>{{ v.cpu }}C / {{ v.ram }}M / {{ v.storage }}G</td>
+                    <td class="mono">{{ v.ip_address or 'DHCP' }}</td>
+                    <td><span class="badge badge-{{ 'success' if v.status == 'running' else 'secondary' }}">{{ (v.status or 'stopped') | upper }}</span></td>
+                    <td style="text-align: right;">
+                        <a href="{{ url_for('vps_detail', vps_id=v.id) }}" class="btn btn-outline btn-xs">Manage</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state"><p>No containers deployed on this node yet.</p></div>
+    {% endif %}
+</div>
+
+<script>
+function copyFullNodeKey() {
+    copyToClipboard("{{ node.api_key or '' }}");
+}
+</script>
+{% endblock %}

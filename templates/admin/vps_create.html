@@ -1,0 +1,155 @@
+{% extends "admin-base.html" %}
+
+{% block title %}Deploy New VPS · {{ panel_name | default('ZK-VPS-PANEL') }}{% endblock %}
+{% block header_title %}Deploy New Virtual Server{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumb">
+    <a href="{{ url_for('admin_dashboard') }}" class="breadcrumb-item">Admin</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <a href="{{ url_for('admin_vps') }}" class="breadcrumb-item">All Servers</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <span class="breadcrumb-item active">Deploy VPS</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 920px; margin: 0 auto;">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-rocket"></i> LXD Instance Deployment Configuration</h3>
+        <a href="{{ url_for('admin_vps') }}" class="btn btn-outline btn-sm">
+            <i class="fas fa-arrow-left"></i> Back to Servers
+        </a>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-danger">
+        <i class="fas fa-circle-exclamation"></i>
+        <span>{{ error }}</span>
+    </div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('admin_vps_create') }}">
+        <!-- Quick Resource Presets -->
+        <div style="margin-bottom: 1.35rem;">
+            <label class="form-label">Quick Compute Plans</label>
+            <div class="grid grid-4">
+                <button type="button" class="btn btn-outline" onclick="applyPreset(1, 1024, 15, 100)" style="flex-direction: column; padding: 0.85rem;">
+                    <strong style="color: var(--blue-300);">Nano Blue</strong>
+                    <span style="font-size: 0.74rem; color: var(--text-secondary);">1 vCPU · 1GB · 15GB</span>
+                </button>
+                <button type="button" class="btn btn-outline" onclick="applyPreset(2, 2048, 30, 250)" style="flex-direction: column; padding: 0.85rem;">
+                    <strong style="color: var(--cyan-400);">Cloud Starter</strong>
+                    <span style="font-size: 0.74rem; color: var(--text-secondary);">2 vCPU · 2GB · 30GB</span>
+                </button>
+                <button type="button" class="btn btn-outline" onclick="applyPreset(4, 4096, 60, 500)" style="flex-direction: column; padding: 0.85rem;">
+                    <strong style="color: #34d399;">Pro Compute</strong>
+                    <span style="font-size: 0.74rem; color: var(--text-secondary);">4 vCPU · 4GB · 60GB</span>
+                </button>
+                <button type="button" class="btn btn-outline" onclick="applyPreset(8, 8192, 120, 1000)" style="flex-direction: column; padding: 0.85rem;">
+                    <strong style="color: #fbbf24;">Enterprise</strong>
+                    <span style="font-size: 0.74rem; color: var(--text-secondary);">8 vCPU · 8GB · 120GB</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="grid grid-2">
+            <div class="form-group">
+                <label class="form-label">Assign to User</label>
+                <select name="user_id" class="form-control" required>
+                    {% for u in users %}
+                    <option value="{{ u.id }}">{{ u.username }} ({{ u.email }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Target Cluster Node</label>
+                <select name="node_id" class="form-control" required>
+                    {% for n in nodes %}
+                    <option value="{{ n.id }}">{{ n.name }} ({{ n.location or 'Default' }} · {{ n.used_vps }}/{{ n.total_vps }} VPS)</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="grid grid-2">
+            <div class="form-group">
+                <label class="form-label">Server Hostname</label>
+                <input type="text" name="hostname" class="form-control" placeholder="e.g. prod-api-01 (optional)">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Operating System Image</label>
+                <select name="os_version" class="form-control" required>
+                    {% for os in os_options %}
+                    <option value="{{ os.value }}">{{ os.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="grid grid-4">
+            <div class="form-group">
+                <label class="form-label">vCPU Cores</label>
+                <input type="number" id="cpuInput" name="cpu" class="form-control" value="1" min="1" max="64" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Memory (MB)</label>
+                <input type="number" id="ramInput" name="ram" class="form-control" value="1024" min="128" step="128" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">NVMe Disk (GB)</label>
+                <input type="number" id="storageInput" name="storage" class="form-control" value="10" min="5" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Bandwidth (Mbps)</label>
+                <input type="number" id="bwInput" name="bandwidth_limit" class="form-control" value="100" min="10" required>
+            </div>
+        </div>
+
+        <div class="grid grid-3">
+            <div class="form-group">
+                <label class="form-label">Storage Pool</label>
+                <input type="text" name="storage_pool" class="form-control" value="{{ storage_pools[0] if storage_pools else 'default' }}">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Expiration Days (0 = Never)</label>
+                <input type="number" name="expiration_days" class="form-control" value="30" min="0">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Custom Expires At (Optional)</label>
+                <input type="datetime-local" name="custom_expires_at" class="form-control">
+            </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 0.65rem; margin-bottom: 1.2rem;">
+            <input type="checkbox" id="autoSuspendChk" name="auto_suspend_enabled" checked style="accent-color: var(--blue-500); width: 16px; height: 16px;">
+            <label for="autoSuspendChk" style="font-size: 0.86rem; color: var(--text-secondary); cursor: pointer;">
+                Automatically suspend server when expiration date is reached
+            </label>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Admin Notes</label>
+            <textarea name="notes" class="form-control" rows="2" placeholder="Optional internal deployment notes..."></textarea>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+            <a href="{{ url_for('admin_vps') }}" class="btn btn-outline">Cancel</a>
+            <button type="submit" class="btn btn-primary btn-lg">
+                <i class="fas fa-bolt"></i> Provision Virtual Server
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+function applyPreset(cpu, ram, disk, bw) {
+    document.getElementById('cpuInput').value = cpu;
+    document.getElementById('ramInput').value = ram;
+    document.getElementById('storageInput').value = disk;
+    document.getElementById('bwInput').value = bw;
+}
+</script>
+{% endblock %}

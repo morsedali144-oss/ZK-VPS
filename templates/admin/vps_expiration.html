@@ -1,0 +1,98 @@
+{% extends "admin-base.html" %}
+
+{% block title %}VPS Expiration · {{ vps.hostname or vps.container_name }} · {{ panel_name | default('ZK-VPS-PANEL') }}{% endblock %}
+{% block header_title %}Expiration & Renewal · {{ vps.hostname or vps.container_name }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumb">
+    <a href="{{ url_for('admin_dashboard') }}" class="breadcrumb-item">Admin</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <a href="{{ url_for('admin_vps') }}" class="breadcrumb-item">All Servers</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <span class="breadcrumb-item active">Expiration</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 780px; margin: 0 auto;">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-hourglass-half"></i> Lifecycle & Expiration Policy</h3>
+        <a href="{{ url_for('admin_vps') }}" class="btn btn-outline btn-sm">
+            <i class="fas fa-arrow-left"></i> Back
+        </a>
+    </div>
+
+    {% if expires_info %}
+    <div class="alert alert-{{ 'danger' if expires_info.is_expired else 'info' }}">
+        <i class="fas fa-calendar-check"></i>
+        <div>
+            <strong>Current Expiration:</strong>
+            {% if expires_info.expires_at %}
+            <code class="mono">{{ expires_info.expires_at }}</code>
+            {% else %}
+            <span>No expiration configured</span>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Quick Renew Buttons -->
+    <div style="margin-bottom: 1.5rem; padding: 1.1rem; background: var(--bg-inset); border-radius: 12px; border: 1px solid var(--border-color);">
+        <div class="form-label" style="margin-bottom: 0.65rem;">Instant Renewal Shortcuts</div>
+        <div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
+            <button type="button" class="btn btn-primary btn-sm" onclick="quickRenew(7)">+7 Days</button>
+            <button type="button" class="btn btn-primary btn-sm" onclick="quickRenew(30)">+30 Days</button>
+            <button type="button" class="btn btn-primary btn-sm" onclick="quickRenew(90)">+90 Days</button>
+            <button type="button" class="btn btn-primary btn-sm" onclick="quickRenew(365)">+1 Year</button>
+        </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('admin_vps_expiration', vps_id=vps.id) }}">
+        <div class="grid grid-2">
+            <div class="form-group">
+                <label class="form-label">Set Expiration Days from Now (0 = Never Expires)</label>
+                <input type="number" name="expiration_days" class="form-control" value="{{ vps.expiration_days or 0 }}" min="0">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Or Exact Expiration Date/Time</label>
+                <input type="datetime-local" name="custom_expires_at" class="form-control" value="{{ vps.expires_at[:16] if vps.expires_at else '' }}">
+            </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 0.65rem; margin-bottom: 1.4rem;">
+            <input type="checkbox" id="autoSuspendExp" name="auto_suspend_enabled" {% if vps.auto_suspend_enabled %}checked{% endif %} style="accent-color: var(--blue-500); width: 16px; height: 16px;">
+            <label for="autoSuspendExp" style="font-size: 0.86rem; color: var(--text-secondary);">
+                Automatically suspend VPS upon expiration
+            </label>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+            <a href="{{ url_for('admin_vps') }}" class="btn btn-outline">Cancel</a>
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-floppy-disk"></i> Save Expiration Policy
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+function quickRenew(days) {
+    showLoading();
+    fetch('/admin/vps/{{ vps.id }}/renew', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ days })
+    })
+    .then(r => r.json())
+    .then(d => {
+        hideLoading();
+        if (d.success) {
+            showToast(d.message || 'Server renewed', 'success');
+            setTimeout(() => location.reload(), 800);
+        } else {
+            showToast(d.error || 'Renewal failed', 'danger');
+        }
+    });
+}
+</script>
+{% endblock %}

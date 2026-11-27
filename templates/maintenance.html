@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Scheduled Maintenance · {{ panel_name | default('ZK-VPS-PANEL') }}{% endblock %}
+{% block header_title %}System Maintenance{% endblock %}
+
+{% block content %}
+<div style="min-height: 68vh; display: flex; align-items: center; justify-content: center;">
+    <div class="card" style="max-width: 560px; width: 100%; text-align: center; padding: 3rem 2rem;">
+        <div class="stat-icon warning" style="width: 68px; height: 68px; font-size: 1.8rem; margin: 0 auto 1.4rem; border-radius: 18px;">
+            <i class="fas fa-screwdriver-wrench"></i>
+        </div>
+        <h2 style="font-size: 1.65rem; font-weight: 800; margin-bottom: 0.65rem;">Scheduled Platform Maintenance</h2>
+        <p style="color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 1.75rem;">
+            {{ message | default('ZK-VPS-PANEL is currently undergoing scheduled infrastructure upgrades. Your virtual servers continue running uninterrupted.') }}
+        </p>
+        <div style="display: flex; justify-content: center; gap: 0.75rem;">
+            <button onclick="location.reload()" class="btn btn-primary">
+                <i class="fas fa-rotate"></i> Check Status
+            </button>
+            {% if not current_user.is_authenticated %}
+            <a href="{{ url_for('login') }}" class="btn btn-outline">
+                <i class="fas fa-shield-halved"></i> Admin Login
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

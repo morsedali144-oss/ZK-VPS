@@ -1,0 +1,23 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Database & runtime files
+*.db
+*.db-shm
+*.db-wal
+*.log
+backups/
+flask_session/
+
+# OS / Editor files
+.DS_Store
+Thumbs立
+.idea/
+.vscode/

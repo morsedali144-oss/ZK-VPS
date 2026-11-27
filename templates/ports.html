@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}Port Forwarding · {{ panel_name | default('ZK-VPS-PANEL') }}{% endblock %}
+{% block header_title %}NAT Port Forwarding Management{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumb">
+    <a href="{{ url_for('dashboard') }}" class="breadcrumb-item">Home</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <span class="breadcrumb-item active">Port Forwarding</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Quota Overview -->
+<div class="grid grid-3" style="margin-bottom: 1.5rem;">
+    <div class="stat-card">
+        <div class="stat-icon primary"><i class="fas fa-gauge-simple-high"></i></div>
+        <div class="stat-content">
+            <div class="stat-label">Total Port Quota</div>
+            <div class="stat-value">{{ allocated | default(user_quota) | default(0) }}</div>
+            <div class="stat-change">Maximum external ports allowed</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon info"><i class="fas fa-plug"></i></div>
+        <div class="stat-content">
+            <div class="stat-label">Allocated Ports</div>
+            <div class="stat-value">{{ used | default(used_ports) | default(0) }}</div>
+            <div class="stat-change">Active NAT forwarding rules</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon success"><i class="fas fa-circle-check"></i></div>
+        <div class="stat-content">
+            <div class="stat-label">Available Ports</div>
+            <div class="stat-value">{{ available | default(available_ports) | default(0) }}</div>
+            <div class="stat-change">Ready for instant allocation</div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-network-wired"></i> Active Port Forwards</h3>
+        {% if vps_list and (available | default(0)) > 0 %}
+        <button type="button" class="btn btn-primary btn-sm" onclick="showModal('newPortModal')">
+            <i class="fas fa-plus"></i> Create Port Forward
+        </button>
+        {% endif %}
+    </div>
+
+    {% set port_items = forwards if forwards is defined else ports %}
+    {% if port_items %}
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Description / Service</th>
+                    <th>Target VPS</th>
+                    <th>Protocol</th>
+                    <th>Internal Port</th>
+                    <th>Public External Port</th>
+                    <th>Public Endpoint</th>
+                    <th>Created</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in port_items %}
+                <tr>
+                    <td style="font-weight: 600;">{{ p.description or p.name or 'Port Forward' }}</td>
+                    <td>
+                        <a href="{{ url_for('vps_detail', vps_id=p.vps_id) }}" style="font-weight: 600;">
+                            {{ p.vps_hostname or p.container_name }}
+                        </a>
+                    </td>
+                    <td><span class="badge badge-primary">{{ (p.protocol or 'tcp') | upper }}</span></td>
+                    <td class="mono">{{ p.vps_port }}</td>
+                    <td class="mono" style="color: var(--cyan-400); font-weight: 700;">{{ p.host_port }}</td>
+                    <td>
+                        <div style="display: inline-flex; align-items: center; gap: 0.45rem;">
+                            <code class="mono" id="ep-{{ p.id }}">{{ p.node_ip or YOUR_SERVER_IP }}:{{ p.host_port }}</code>
+                            <button type="button" class="btn-icon" onclick="copyToClipboard('ep-{{ p.id }}')">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </td>
+                    <td style="font-size: 0.78rem; color: var(--text-muted);">{{ p.created_at | timeago }}</td>
+                    <td style="text-align: right;">
+                        <button type="button" class="btn btn-danger btn-sm" onclick="removePort({{ p.id }})">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="fas fa-network-wired"></i>
+        <h3>No Active Port Forwarding Rules</h3>
+        <p>Expose internal services running on your virtual servers to the public internet.</p>
+        {% if vps_list and (available | default(0)) > 0 %}
+        <button type="button" class="btn btn-primary" onclick="showModal('newPortModal')">
+            <i class="fas fa-plus"></i> Add First Port Rule
+        </button>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- Add Port Modal -->
+<div class="modal" id="newPortModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-plus-circle" style="color: var(--blue-400);"></i> Create NAT Port Forward</h3>
+            <button type="button" class="modal-close" onclick="hideModal('newPortModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Select Virtual Server</label>
+                <select id="portVpsSelect" class="form-control">
+                    {% for v in (vps_list or []) %}
+                    <option value="{{ v.id }}">{{ v.hostname or v.container_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Service / Description</label>
+                <input type="text" id="portNameInput" class="form-control" placeholder="e.g. HTTP API, Game Server">
+            </div>
+            <div class="grid grid-2">
+                <div class="form-group">
+                    <label class="form-label">Internal VPS Port</label>
+                    <input type="number" id="portInternalInput" class="form-control" placeholder="e.g. 3000" min="1" max="65535">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Protocol</label>
+                    <select id="portProtoSelect" class="form-control">
+                        <option value="tcp">TCP</option>
+                        <option value="udp">UDP</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline" onclick="hideModal('newPortModal')">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="createPortForward()">Allocate Port</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function createPortForward() {
+    const vps_id = document.getElementById('portVpsSelect').value;
+    const description = document.getElementById('portNameInput').value.trim();
+    const vps_port = parseInt(document.getElementById('portInternalInput').value, 10);
+    const protocol = document.getElementById('portProtoSelect').value;
+    if (!vps_id || !vps_port) {
+        showToast('Please select a server and internal port', 'warning');
+        return;
+    }
+    showLoading();
+    fetch('/ports/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vps_id, vps_port, protocol, description })
+    })
+    .then(r => r.json())
+    .then(d => {
+        hideLoading();
+        if (d.success) {
+            hideModal('newPortModal');
+            showToast(`Allocated external port ${d.host_port || ''}`, 'success');
+            setTimeout(() => location.reload(), 800);
+        } else {
+            showToast(d.error || 'Failed to allocate port', 'danger');
+        }
+    });
+}
+
+function removePort(forwardId) {
+    if (!confirm('Delete this port forward rule?')) return;
+    showLoading();
+    fetch(`/ports/remove/${forwardId}`, { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+            hideLoading();
+            if (d.success) {
+                showToast('Port forward deleted', 'success');
+                setTimeout(() => location.reload(), 700);
+            } else {
+                showToast(d.error || 'Failed to delete port', 'danger');
+            }
+        });
+}
+</script>
+{% endblock %}

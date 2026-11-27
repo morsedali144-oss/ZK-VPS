@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}Web Console · {{ vps.hostname or vps.container_name }} · {{ panel_name | default('ZK-VPS-PANEL') }}{% endblock %}
+{% block header_title %}Interactive Web Terminal · {{ vps.hostname or vps.container_name }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumb">
+    <a href="{{ url_for('dashboard') }}" class="breadcrumb-item">Home</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <a href="{{ url_for('vps_detail', vps_id=vps.id) }}" class="breadcrumb-item">{{ vps.hostname or vps.container_name }}</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <span class="breadcrumb-item active">Web Console</span>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="card" style="padding: 1.2rem; border-color: rgba(59, 130, 246, 0.3);">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-bottom: 1rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <span class="status-indicator">
+                <span class="status-dot running"></span>
+                <span>TERMINAL READY</span>
+            </span>
+            <span class="mono" style="font-size: 0.8rem; color: var(--blue-300);">root@{{ vps.container_name }}</span>
+            <span class="badge badge-info">{{ vps_ip or vps.ip_address or 'LXD Shell' }}</span>
+        </div>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button type="button" class="btn btn-outline btn-sm" onclick="sendQuickCommand('uname -a')">
+                <i class="fas fa-linux"></i> Kernel
+            </button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="sendQuickCommand('ps aux')">
+                <i class="fas fa-microchip"></i> Processes
+            </button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="sendQuickCommand('df -h && free -m')">
+                <i class="fas fa-hard-drive"></i> Disk & RAM
+            </button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="clearTerminal()">
+                <i class="fas fa-eraser"></i> Clear
+            </button>
+            <a href="{{ url_for('vps_detail', vps_id=vps.id) }}" class="btn btn-primary btn-sm">
+                <i class="fas fa-arrow-left"></i> Back to Server
+            </a>
+        </div>
+    </div>
+
+    <div id="terminalContainer" style="background: #020611; border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 12px; padding: 0.75rem; height: 460px; overflow: hidden;"></div>
+
+    <form id="quickCmdForm" style="display: flex; gap: 0.65rem; margin-top: 1rem;" onsubmit="executeHttpCommand(event)">
+        <div style="position: relative; flex: 1;">
+            <span class="mono" style="position: absolute; left: 0.9rem; top: 50%; transform: translateY(-50%); color: var(--cyan-400); font-weight: 700;">#</span>
+            <input type="text" id="quickCmdInput" class="form-control mono" style="padding-left: 2.1rem;" placeholder="Run shell command inside container (e.g. uname -a, ls -la, df -h, ip a)...">
+        </div>
+        <button type="submit" class="btn btn-primary">
+            <i class="fas fa-paper-plane"></i> Execute
+        </button>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+<script>
+const vpsId = {{ vps.id }};
+let term = null;
+let socket = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    term = new Terminal({
+        cursorBlink: true,
+        fontFamily: "'JetBrains Mono', monospace",
+        fontSize: 13,
+        theme: {
+            background: '#020611',
+            foreground: '#e2e8f0',
+            cursor: '#38bdf8',
+            selectionBackground: 'rgba(59, 130, 246, 0.35)'
+        }
+    });
+    const fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(document.getElementById('terminalContainer'));
+    fitAddon.fit();
+
+    term.writeln('\x1b[1;34m========================================================\x1b[0m');
+    term.writeln('\x1b[1;36m  ZK-VPS-PANEL Interactive LXD Container Shell\x1b[0m');
+    term.writeln('\x1b[0;37m  Instance: {{ vps.hostname or vps.container_name }} ({{ vps.container_name }})\x1b[0m');
+    term.writeln('\x1b[1;34m========================================================\x1b[0m');
+    term.write('\r\n\x1b[1;36mroot@{{ vps.container_name }}:~#\x1b[0m ');
+
+    let cmdBuffer = '';
+    term.onData(data => {
+        if (data === '\r') {
+            const cmd = cmdBuffer.trim();
+            cmdBuffer = '';
+            if (cmd) {
+                runShellCmd(cmd);
+            } else {
+                term.write('\r\n\x1b[1;36mroot@{{ vps.container_name }}:~#\x1b[0m ');
+            }
+        } else if (data === '\u007F') {
+            if (cmdBuffer.length > 0) {
+                cmdBuffer = cmdBuffer.slice(0, -1);
+                term.write('\b \b');
+            }
+        } else if (data >= ' ') {
+            cmdBuffer += data;
+            term.write(data);
+        }
+    });
+
+    window.addEventListener('resize', () => fitAddon.fit());
+});
+
+function clearTerminal() {
+    if (term) {
+        term.clear();
+        term.write('\x1b[1;36mroot@{{ vps.container_name }}:~#\x1b[0m ');
+    }
+}
+
+function sendQuickCommand(cmd) {
+    document.getElementById('quickCmdInput').value = cmd;
+    executeHttpCommand(new Event('submit'));
+}
+
+function executeHttpCommand(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const input = document.getElementById('quickCmdInput');
+    const command = input.value.trim();
+    if (!command) return;
+    input.value = '';
+    if (term) {
+        term.writeln(command);
+    }
+    runShellCmd(command);
+}
+
+function runShellCmd(command) {
+    fetch(`/vps/${vpsId}/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command })
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.success && term) {
+            if (d.output) {
+                term.writeln('\r\n' + d.output.replace(/\n/g, '\r\n'));
+            }
+        } else if (term) {
+            term.writeln(`\r\n\x1b[1;31mError: ${d.error || 'Command failed'}\x1b[0m`);
+        }
+        if (term) term.write('\x1b[1;36mroot@{{ vps.container_name }}:~#\x1b[0m ');
+    })
+    .catch(() => {
+        if (term) {
+            term.writeln('\r\n\x1b[1;31mNetwork error executing command\x1b[0m');
+            term.write('\x1b[1;36mroot@{{ vps.container_name }}:~#\x1b[0m ');
+        }
+    });
+}
+</script>
+{% endblock %}

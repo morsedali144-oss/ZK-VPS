@@ -1,0 +1,197 @@
+{% extends "admin-base.html" %}
+
+{% block title %}Manage All Servers · {{ panel_name | default('ZK-VPS-PANEL') }}{% endblock %}
+{% block header_title %}All Virtual Private Servers{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumb">
+    <a href="{{ url_for('admin_dashboard') }}" class="breadcrumb-item">Admin</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <span class="breadcrumb-item active">All Servers</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-cubes"></i> Provisioned VPS Instances ({{ vps_list | length }})</h3>
+        <div style="display: flex; gap: 0.65rem; align-items: center; flex-wrap: wrap;">
+            <input type="text" id="adminVpsSearch" class="form-control" placeholder="Search server, owner, node, IP..." style="width: 250px; padding: 0.42rem 0.75rem; font-size: 0.82rem;">
+            <a href="{{ url_for('admin_vps_expiring') }}?days=30" class="btn btn-outline btn-sm">
+                <i class="fas fa-hourglass-half"></i> Expiring Servers
+            </a>
+            <a href="{{ url_for('admin_vps_create') }}" class="btn btn-primary btn-sm">
+                <i class="fas fa-plus"></i> Deploy New VPS
+            </a>
+        </div>
+    </div>
+
+    {% if vps_list %}
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Instance</th>
+                    <th>Owner</th>
+                    <th>Node</th>
+                    <th>Resources</th>
+                    <th>Network</th>
+                    <th>Status</th>
+                    <th>Expiration</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for vps in vps_list %}
+                <tr class="admin-vps-row" data-search="{{ (vps.hostname or vps.container_name) | lower }} {{ (vps.username or '') | lower }} {{ (vps.ip_address or '') | lower }} {{ (vps.node_name or '') | lower }}">
+                    <td class="mono">#{{ vps.id }}</td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 0.65rem;">
+                            <div class="stat-icon primary" style="width: 34px; height: 34px; border-radius: 9px; font-size: 0.95rem;">
+                                <i class="{{ get_os_icon(vps.os_version) }}"></i>
+                            </div>
+                            <div>
+                                <a href="{{ url_for('vps_detail', vps_id=vps.id) }}" style="font-weight: 700; color: #fff;">
+                                    {{ vps.hostname or vps.container_name }}
+                                </a>
+                                <div class="mono" style="font-size: 0.72rem; color: var(--text-muted);">{{ vps.container_name }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <a href="{{ url_for('admin_user_detail', user_id=vps.user_id) }}" style="font-weight: 600;">
+                            {{ vps.username }}
+                        </a>
+                    </td>
+                    <td>{{ vps.node_name or 'Local' }}</td>
+                    <td>
+                        <span class="badge badge-primary">{{ vps.cpu }}C</span>
+                        <span class="badge badge-info">{{ vps.ram }}M</span>
+                        <span class="badge badge-secondary">{{ vps.storage }}G</span>
+                    </td>
+                    <td class="mono" style="font-size: 0.78rem;">
+                        <div>{{ vps.ip_address or 'DHCP' }}</div>
+                        {% if vps.ssh_port %}<div style="color: var(--cyan-400);">SSH :{{ vps.ssh_port }}</div>{% endif %}
+                    </td>
+                    <td>
+                        {% if vps.suspended %}
+                        <span class="status-indicator"><span class="status-dot suspended"></span><span style="color:#fcd34d;">SUSPENDED</span></span>
+                        {% else %}
+                        <span class="status-indicator"><span class="status-dot {{ vps.live_status }}"></span><span>{{ vps.live_status | upper }}</span></span>
+                        {% endif %}
+                    </td>
+                    <td style="font-size: 0.78rem;">
+                        {% if vps.expires_at %}
+                        <a href="{{ url_for('admin_vps_expiration', vps_id=vps.id) }}" class="badge badge-warning">
+                            {{ vps.expires_at[:10] }}
+                        </a>
+                        {% else %}
+                        <a href="{{ url_for('admin_vps_expiration', vps_id=vps.id) }}" style="color: var(--text-muted);">Never</a>
+                        {% endif %}
+                    </td>
+                    <td style="text-align: right;">
+                        <div style="display: inline-flex; gap: 0.3rem; flex-wrap: nowrap;">
+                            <a href="{{ url_for('vps_detail', vps_id=vps.id) }}" class="btn btn-outline btn-xs" title="View Details">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            <a href="{{ url_for('admin_vps_edit', vps_id=vps.id) }}" class="btn btn-outline btn-xs" title="Edit Server">
+                                <i class="fas fa-pen"></i>
+                            </a>
+                            <a href="{{ url_for('admin_vps_expiration', vps_id=vps.id) }}" class="btn btn-outline btn-xs" title="Expiration Settings">
+                                <i class="fas fa-clock"></i>
+                            </a>
+                            {% if vps.suspended %}
+                            <button type="button" class="btn btn-success btn-xs" onclick="unsuspendVps({{ vps.id }})" title="Unsuspend">
+                                <i class="fas fa-unlock"></i>
+                            </button>
+                            {% else %}
+                            <button type="button" class="btn btn-warning btn-xs" onclick="suspendVps({{ vps.id }})" title="Suspend">
+                                <i class="fas fa-ban"></i>
+                            </button>
+                            {% endif %}
+                            <button type="button" class="btn btn-danger btn-xs" onclick="deleteVps({{ vps.id }}, '{{ vps.hostname or vps.container_name }}')" title="Delete VPS">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="fas fa-server"></i>
+        <h3>No Virtual Servers Provisioned</h3>
+        <p>Deploy your first LXD virtual server to get started.</p>
+        <a href="{{ url_for('admin_vps_create') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Deploy Server
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('adminVpsSearch')?.addEventListener('input', function() {
+    const q = this.value.toLowerCase().trim();
+    document.querySelectorAll('.admin-vps-row').forEach(r => {
+        r.style.display = r.dataset.search.includes(q) ? '' : 'none';
+    });
+});
+
+function suspendVps(id) {
+    const reason = prompt('Enter suspension reason:', 'Administrative suspension');
+    if (reason === null) return;
+    showLoading();
+    fetch(`/admin/vps/${id}/suspend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason })
+    })
+    .then(r => r.json())
+    .then(d => {
+        hideLoading();
+        if (d.success) {
+            showToast('Server suspended', 'success');
+            setTimeout(() => location.reload(), 700);
+        } else {
+            showToast(d.error || 'Failed to suspend', 'danger');
+        }
+    });
+}
+
+function unsuspendVps(id) {
+    showLoading();
+    fetch(`/admin/vps/${id}/unsuspend`, { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+            hideLoading();
+            if (d.success) {
+                showToast('Server unsuspended', 'success');
+                setTimeout(() => location.reload(), 700);
+            } else {
+                showToast(d.error || 'Failed to unsuspend', 'danger');
+            }
+        });
+}
+
+function deleteVps(id, name) {
+    if (!confirm(`Permanently delete VPS "${name}" (#${id}) and all its data?`)) return;
+    showLoading();
+    fetch(`/admin/vps/${id}/delete`, { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+            hideLoading();
+            if (d.success) {
+                showToast('Server deleted', 'success');
+                setTimeout(() => location.reload(), 700);
+            } else {
+                showToast(d.error || 'Failed to delete server', 'danger');
+            }
+        });
+}
+</script>
+{% endblock %}

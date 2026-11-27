@@ -1,0 +1,141 @@
+{% extends "admin-base.html" %}
+
+{% block title %}OS Images & Icons · {{ panel_name | default('ZK-VPS-PANEL') }}{% endblock %}
+{% block header_title %}Operating System Images & Brand Icons{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumb">
+    <a href="{{ url_for('admin_dashboard') }}" class="breadcrumb-item">Admin</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <span class="breadcrumb-item active">OS Icons</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-3" style="margin-bottom: 1.5rem;">
+    <!-- Upload / Register OS Icon -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-plus-circle"></i> Upload OS Icon</h3>
+        </div>
+        <form id="uploadOsIconForm" onsubmit="submitOsIcon(event)">
+            <div class="form-group">
+                <label class="form-label">OS Identifier</label>
+                <input type="text" name="os_name" id="osNameInput" class="form-control" placeholder="e.g. ubuntu, debian, rocky" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Display Name</label>
+                <input type="text" name="display_name" id="displayNameInput" class="form-control" placeholder="e.g. Ubuntu Linux" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">FontAwesome Icon Class</label>
+                <input type="text" name="icon_class" id="iconClassInput" class="form-control" value="fab fa-linux" placeholder="fab fa-ubuntu">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Custom Icon Image (Optional)</label>
+                <input type="file" name="icon_file" id="iconFileInput" class="form-control" accept="image/*">
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">
+                <i class="fas fa-cloud-arrow-up"></i> Save OS Icon
+            </button>
+        </form>
+    </div>
+
+    <!-- Registered OS Icons Table -->
+    <div class="card" style="grid-column: span 2;">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fab fa-linux"></i> Registered OS Icons ({{ icons | length }})</h3>
+        </div>
+        {% if icons %}
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Preview</th>
+                        <th>OS Key</th>
+                        <th>Display Name</th>
+                        <th>Icon Class</th>
+                        <th style="text-align: right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for icon in icons %}
+                    <tr>
+                        <td>
+                            <div class="stat-icon primary" style="width: 38px; height: 38px; border-radius: 10px;">
+                                {% if icon.icon_path %}
+                                <img src="/{{ icon.icon_path }}" alt="{{ icon.display_name }}" style="width: 24px; height: 24px; object-fit: contain;">
+                                {% else %}
+                                <i class="{{ icon.icon_class or 'fab fa-linux' }}"></i>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="mono" style="font-weight: 600;">{{ icon.os_name }}</td>
+                        <td>{{ icon.display_name }}</td>
+                        <td class="mono" style="font-size: 0.78rem; color: var(--blue-300);">{{ icon.icon_class }}</td>
+                        <td style="text-align: right;">
+                            <button type="button" class="btn btn-danger btn-xs" onclick="deleteIcon('{{ icon.os_name }}')">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="fab fa-linux"></i>
+            <h3>No Custom OS Icons</h3>
+            <p>Default FontAwesome distribution icons are currently active.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function submitOsIcon(e) {
+    e.preventDefault();
+    const form = document.getElementById('uploadOsIconForm');
+    const fd = new FormData(form);
+    showLoading();
+    try {
+        const response = await fetch('/os-icons/upload', {
+            method: 'POST',
+            body: fd
+        });
+        const data = await response.json();
+        hideLoading();
+        if (data.success) {
+            showToast(data.message || 'OS icon saved', 'success');
+            setTimeout(() => location.reload(), 700);
+        } else {
+            showToast(data.error || 'Failed to save OS icon', 'danger');
+        }
+    } catch (err) {
+        hideLoading();
+        showToast('Network error saving OS icon', 'danger');
+    }
+}
+
+async function deleteIcon(osName) {
+    if (!confirm(`Delete custom icon for "${osName}"?`)) return;
+    try {
+        const response = await fetch(`/os-icons/${osName}/delete`, {
+            method: 'POST'
+        });
+        const data = await response.json();
+        if (data.success) {
+            showToast(data.message || 'Icon deleted', 'success');
+            setTimeout(() => location.reload(), 600);
+        } else {
+            showToast(data.error || 'Failed to delete icon', 'danger');
+        }
+    } catch (err) {
+        showToast('Error deleting icon', 'danger');
+    }
+}
+</script>
+{% endblock %}

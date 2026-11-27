@@ -1,0 +1,113 @@
+{% extends "admin-base.html" %}
+
+{% block title %}Database Backups · {{ panel_name | default('ZK-VPS-PANEL') }}{% endblock %}
+{% block header_title %}Panel Database Backups{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumb">
+    <a href="{{ url_for('admin_dashboard') }}" class="breadcrumb-item">Admin</a>
+    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+    <span class="breadcrumb-item active">Backups</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-database"></i> SQLite Database Snapshots ({{ backups | length }})</h3>
+        <button type="button" class="btn btn-primary btn-sm" onclick="createDbBackup()">
+            <i class="fas fa-plus"></i> Create Database Backup
+        </button>
+    </div>
+
+    {% if backups %}
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Filename</th>
+                    <th>Size</th>
+                    <th>Created</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in backups %}
+                <tr>
+                    <td class="mono" style="font-weight: 600; color: var(--blue-300);">{{ b.name }}</td>
+                    <td class="mono">{{ b.size | filesizeformat }}</td>
+                    <td>{{ b.created | timeago }}</td>
+                    <td style="text-align: right;">
+                        <a href="{{ url_for('admin_backup_download', filename=b.name) }}" class="btn btn-outline btn-xs">
+                            <i class="fas fa-download"></i> Download
+                        </a>
+                        {% if current_user.is_main_admin %}
+                        <button type="button" class="btn btn-warning btn-xs" onclick="restoreDbBackup('{{ b.name }}')">
+                            <i class="fas fa-rotate-left"></i> Restore
+                        </button>
+                        {% endif %}
+                        <button type="button" class="btn btn-danger btn-xs" onclick="deleteDbBackup('{{ b.name }}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="fas fa-database"></i>
+        <h3>No Database Backups Yet</h3>
+        <p>Create an instant backup of the panel SQLite database before performing maintenance.</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function createDbBackup() {
+    showLoading();
+    fetch('/admin/backup/create', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+            hideLoading();
+            if (d.success) {
+                showToast('Database backup created', 'success');
+                setTimeout(() => location.reload(), 800);
+            } else {
+                showToast(d.error || 'Backup failed', 'danger');
+            }
+        });
+}
+
+function restoreDbBackup(filename) {
+    if (!confirm(`Restore database from "${filename}"? Current state will be replaced.`)) return;
+    showLoading();
+    fetch(`/admin/backup/restore/${encodeURIComponent(filename)}`, { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+            hideLoading();
+            if (d.success) {
+                showToast('Database restored', 'success');
+                setTimeout(() => location.reload(), 900);
+            } else {
+                showToast(d.error || 'Restore failed', 'danger');
+            }
+        });
+}
+
+function deleteDbBackup(filename) {
+    if (!confirm(`Delete backup "${filename}"?`)) return;
+    fetch(`/admin/backup/delete/${encodeURIComponent(filename)}`, { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+            if (d.success) {
+                showToast('Backup deleted', 'success');
+                setTimeout(() => location.reload(), 600);
+            } else {
+                showToast(d.error || 'Delete failed', 'danger');
+            }
+        });
+}
+</script>
+{% endblock %}
