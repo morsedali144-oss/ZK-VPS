@@ -152,6 +152,30 @@ OS_ICONS = {
     "default": "fab fa-linux"
 }
 
+PANEL_THEMES = [
+    {"id": "obsidian-blue", "name": "Obsidian Cobalt Blue", "desc": "Signature deep navy canvas with cobalt & electric cyan accents", "preview": ["#040812", "#0b1325", "#2563eb", "#0ea5e9"]},
+    {"id": "arctic-cyan", "name": "Arctic Ice Cyan", "desc": "Glacier slate surfaces with luminous cyan & aqua highlights", "preview": ["#020b14", "#071a2c", "#0891b2", "#38bdf8"]},
+    {"id": "royal-sapphire", "name": "Royal Sapphire Indigo", "desc": "Midnight sapphire depth with royal indigo & sky blue glow", "preview": ["#06071b", "#101436", "#4f46e5", "#60a5fa"]},
+    {"id": "neon-cyber", "name": "Cyberpunk Neon Azure", "desc": "High-contrast pitch cyber dark with neon azure borders", "preview": ["#02040a", "#091326", "#0066ff", "#00e5ff"]},
+    {"id": "emerald-matrix", "name": "Abyssal Ocean Emerald", "desc": "Deep ocean blue-teal paired with emerald cyber accents", "preview": ["#030f14", "#082029", "#0ea5e9", "#10b981"]},
+    {"id": "crimson-eclipse", "name": "Midnight Violet Eclipse", "desc": "Obsidian cosmos with electric indigo & magenta-blue accents", "preview": ["#080514", "#140e2b", "#6366f1", "#ec4899"]},
+]
+
+BG_IMAGE_PRESETS = [
+    {"id": "none", "name": "Default Gradient Canvas (No Image)", "url": "none"},
+    {"id": "deep-nebula", "name": "Deep Sapphire Nebula", "url": "/static/img/backgrounds/deep-nebula.png"},
+    {"id": "cyber-grid", "name": "Cyber Grid Matrix", "url": "/static/img/backgrounds/cyber-grid.png"},
+    {"id": "circuit-matrix", "name": "Blue Circuit Topology", "url": "/static/img/backgrounds/circuit-matrix.png"},
+    {"id": "aurora-waves", "name": "Aurora Borealis Waves", "url": "/static/img/backgrounds/aurora-waves.png"},
+]
+
+BG_MUSIC_PRESETS = [
+    {"id": "none", "name": "Disabled (No Background Music)", "url": "none"},
+    {"id": "deep-cloud", "name": "Deep Cloud Pad (Ambient Synth)", "url": "/static/audio/presets/deep-cloud-ambient.wav"},
+    {"id": "cyber-pulse", "name": "Cyber Node Pulse (Sci-Fi Lo-Fi)", "url": "/static/audio/presets/cyber-node-pulse.wav"},
+    {"id": "midnight-horizon", "name": "Midnight Horizon (Calm Space Drone)", "url": "/static/audio/presets/midnight-horizon.wav"},
+]
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -398,6 +422,10 @@ def init_db():
             ('header_icon', '/static/img/logo.png', 'Header icon path'),
             ('favicon', '/static/img/favicon.ico', 'Favicon path'),
             ('footer_text', 'ZK-VPS-PANEL', 'Footer text'),
+            ('panel_theme', 'obsidian-blue', 'Active panel color theme'),
+            ('bg_image_url', '/static/img/backgrounds/deep-nebula.png', 'Background image URL or preset'),
+            ('bg_overlay_opacity', '0.78', 'Background dark overlay opacity'),
+            ('bg_music_url', '/static/audio/presets/deep-cloud-ambient.wav', 'Background ambient music URL or preset'),
             ('maintenance_mode', '0', 'Maintenance mode (1=enabled, 0=disabled)'),
             ('maintenance_message', 'Site is under maintenance. Please check back later.', 'Maintenance message'),
             ('registration_enabled', '1', 'Registration enabled (1=enabled, 0=disabled)'),
@@ -1609,7 +1637,10 @@ def utility_processor():
         PANEL_DEVELOPER=PANEL_DEVELOPER,
         YOUR_SERVER_IP=YOUR_SERVER_IP,
         socketio_available=SOCKETIO_AVAILABLE,
-        DEMO_MODE=DEMO_MODE
+        DEMO_MODE=DEMO_MODE,
+        PANEL_THEMES=PANEL_THEMES,
+        BG_IMAGE_PRESETS=BG_IMAGE_PRESETS,
+        BG_MUSIC_PRESETS=BG_MUSIC_PRESETS
     )
 
 def is_vps_suspended(vps):
@@ -5206,6 +5237,7 @@ if socketio and SSH_AVAILABLE:
                     logger.error(f"SSH disconnect error for VPS {vps_id}: {e}")
 
 @app.route('/vps/<int:vps_id>/ssh', methods=['POST'])
+@app.route('/vps/<int:vps_id>/tmate', methods=['POST'])
 @login_required
 def vps_ssh(vps_id):
     vps = get_vps_by_id(vps_id)
@@ -5218,8 +5250,21 @@ def vps_ssh(vps_id):
     try:
         container_name = vps['container_name']
         node_id = vps['node_id']
-        session_name = f"nrb-session-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        session_name = f"zk-session-{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
+        if DEMO_MODE:
+            token = secrets.token_urlsafe(12)
+            ssh_url = f"ssh {token}@lon1.tmate.io"
+            web_url = f"https://tmate.io/t/{token}"
+            log_activity(current_user.id, 'generate_tmate_ssh', 'vps', str(vps_id))
+            create_notification(current_user.id, 'info', 'Tmate SSH Link Generated', f'Tmate session created for {container_name}')
+            return jsonify({
+                'success': True,
+                'ssh_url': ssh_url,
+                'web_url': web_url,
+                'session': session_name
+            })
+
         try:
             run_sync(execute_container(container_name, f"exec {container_name} -- which tmate", node_id=node_id))
         except:
@@ -5255,6 +5300,72 @@ def vps_ssh(vps_id):
             return jsonify({'success': False, 'error': 'Could not generate SSH URL'}), 500
     except Exception as e:
         logger.error(f"SSH generation error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/vps/<int:vps_id>/sshx', methods=['POST'])
+@login_required
+def vps_sshx(vps_id):
+    """Generate an interactive SSHX collaborative web terminal link for a VPS."""
+    vps = get_vps_by_id(vps_id)
+    if not vps or (vps['user_id'] != current_user.id and not current_user.is_admin):
+        return jsonify({'success': False, 'error': 'Access denied'}), 403
+
+    if is_vps_suspended(vps) and not current_user.is_admin:
+        return jsonify({'success': False, 'error': 'VPS is suspended'}), 403
+
+    try:
+        container_name = vps['container_name']
+        node_id = vps['node_id']
+
+        if DEMO_MODE:
+            slug = secrets.token_urlsafe(8)
+            key = secrets.token_urlsafe(10)
+            sshx_url = f"https://sshx.io/s/{slug}#{key}"
+            log_activity(current_user.id, 'generate_sshx', 'vps', str(vps_id))
+            create_notification(current_user.id, 'info', 'SSHX Link Generated', f'SSHX web terminal link created for {container_name}')
+            return jsonify({
+                'success': True,
+                'sshx_url': sshx_url,
+                'container': container_name
+            })
+
+        script = r"""set -e
+if ! command -v sshx >/dev/null 2>&1; then
+  if ! command -v curl >/dev/null 2>&1; then
+    if command -v apt-get >/dev/null 2>&1; then
+      apt-get update -y >/dev/null 2>&1 && apt-get install -y curl ca-certificates >/dev/null 2>&1
+    elif command -v apk >/dev/null 2>&1; then
+      apk add --no-cache curl ca-certificates >/dev/null 2>&1
+    fi
+  fi
+  curl -sSf https://sshx.io/get | sh >/dev/null 2>&1
+fi
+rm -f /tmp/zk-sshx.log
+nohup sshx -q >/tmp/zk-sshx.log 2>&1 </dev/null &
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  if grep -Eo 'https://sshx\.io/s/[A-Za-z0-9_#-]+' /tmp/zk-sshx.log 2>/dev/null | head -n1; then
+    exit 0
+  fi
+  sleep 1
+done
+cat /tmp/zk-sshx.log 2>/dev/null || true
+exit 1
+"""
+        out = run_sync(execute_container(container_name, f"exec {shlex.quote(container_name)} -- sh -lc {shlex.quote(script)}", timeout=90, node_id=node_id))
+        match = re.search(r"https://sshx\.io/s/[A-Za-z0-9_#-]+", str(out or ""))
+        if not match:
+            return jsonify({'success': False, 'error': 'Could not extract SSHX URL from container output'}), 500
+        sshx_url = match.group(0)
+        log_activity(current_user.id, 'generate_sshx', 'vps', str(vps_id))
+        create_notification(current_user.id, 'info', 'SSHX Link Generated', f'SSHX web terminal link created for {container_name}')
+        return jsonify({
+            'success': True,
+            'sshx_url': sshx_url,
+            'container': container_name
+        })
+    except Exception as e:
+        logger.error(f"SSHX generation error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/vps/<int:vps_id>/stats')
@@ -6859,17 +6970,20 @@ def admin_vps_create():
                               nodes=nodes,
                               os_options=OS_OPTIONS)
     
-    data = request.get_json()
-    user_id = data.get('user_id')
-    node_id = data.get('node_id')
-    ram = int(data.get('ram', 2))
-    cpu = int(data.get('cpu', 2))
-    disk = int(data.get('disk', 20))
+    is_json_req = request.is_json
+    data = request.get_json(silent=True) if is_json_req else request.form
+    data = data or {}
+    user_id = int(data.get('user_id', 0) or 0)
+    node_id = int(data.get('node_id', 0) or 0)
+    raw_ram = int(data.get('ram', 2) or 2)
+    ram = max(1, raw_ram // 1024) if raw_ram > 128 else raw_ram
+    cpu = int(data.get('cpu', 2) or 2)
+    disk = int(data.get('disk') or data.get('storage') or 20)
     os_version = data.get('os_version', 'ubuntu:22.04')
     hostname = data.get('hostname')
     ip_address = data.get('ip_address', '').strip() if data.get('ip_address') else None
     ip_alias = data.get('ip_alias', '').strip() if data.get('ip_alias') else None
-    expiration_days = int(data.get('expiration_days', 0))
+    expiration_days = int(data.get('expiration_days', 0) or 0)
     auto_suspend_enabled = bool(data.get('auto_suspend_enabled', False))
 
     # Validate VPS resources before touching LXD so bad values never reach the daemon.
@@ -6914,24 +7028,24 @@ def admin_vps_create():
             cur.execute('SELECT COUNT(*) FROM vps WHERE user_id = ?', (user_id,))
             vps_count = cur.fetchone()[0] + 1
         
-        container_name = f"nrb-server-{user_id}-{vps_count}"
+        container_name = f"zk-server-{user_id}-{vps_count}"
         if hostname:
             container_name = hostname.lower().replace(' ', '-').replace('_', '-')
             container_name = re.sub(r'[^a-z0-9\-]', '', container_name)
         
         ram_mb = ram * 1024
         
-        run_sync(execute_container(container_name, f"init {os_version} {container_name} -m {ram_mb}MB -c {cpu} -d {disk}GB", node_id=node_id))
-        
-        
-        run_sync(apply_lxd_config(container_name, node_id))
-        run_sync(execute_container(container_name, f"start {container_name}", node_id=node_id))
-        
-        # Configure IP after container is started
-        if ip_address:
-            run_sync(configure_container_ip(container_name, ip_address, node_id))
-        
-        ssh_ready = run_sync(configure_ssh_and_root_password(container_name, node_id))
+        if not DEMO_MODE:
+            run_sync(execute_container(container_name, f"init {os_version} {container_name} -m {ram_mb}MB -c {cpu} -d {disk}GB", node_id=node_id))
+            run_sync(apply_lxd_config(container_name, node_id))
+            run_sync(execute_container(container_name, f"start {container_name}", node_id=node_id))
+            if ip_address:
+                run_sync(configure_container_ip(container_name, ip_address, node_id))
+            ssh_ready = run_sync(configure_ssh_and_root_password(container_name, node_id))
+        else:
+            ssh_ready = "DemoRootPass#2026"
+            if not ip_address:
+                ip_address = f"10.0.10.{20 + vps_count}"
         logger.info(f"SSH setup result for {container_name}: {'ready' if ssh_ready else 'pending'}")
         
         config_str = f"{ram}GB RAM / {cpu} CPU / {disk}GB Disk"
@@ -6951,7 +7065,7 @@ def admin_vps_create():
             auto_suspend_enabled=auto_suspend_enabled
         )
 
-        tailscale_info = run_sync(configure_tailscale(container_name, node_id))
+        tailscale_info = run_sync(configure_tailscale(container_name, node_id)) if not DEMO_MODE else {'status': 'demo'}
         metadata = {'tailscale': tailscale_info}
         if ssh_ready:
             metadata['ssh_password_encrypted'] = encrypt_vps_ssh_password(ssh_ready)
@@ -6961,6 +7075,9 @@ def admin_vps_create():
         log_activity(current_user.id, 'admin_create_vps', 'vps', str(vps_id),
                     {'user_id': user_id, 'container': container_name})
         create_notification(user_id, 'success', 'VPS Created', f'Your VPS {container_name} has been created by an administrator.')
+        if not is_json_req:
+            flash(f'VPS {container_name} deployed successfully.', 'success')
+            return redirect(url_for('admin_vps'))
         return jsonify({'success': True, 'vps_id': vps_id, 'container_name': container_name})
     except Exception as e:
         logger.error(f"VPS creation error: {e}")
@@ -7350,17 +7467,41 @@ def admin_settings():
     if request.method == 'POST':
         data = request.form
 
-        settings = [
+        settings_keys = [
             'site_name', 'site_description', 'header_icon', 'favicon',
             'footer_text', 'maintenance_message',
             'cpu_threshold', 'ram_threshold',
             'default_port_quota', 'max_vps_per_user', 'session_timeout',
-            'backup_retention', 'theme', 'language', 'timezone',
+            'backup_retention', 'theme', 'panel_theme',
+            'bg_image_url', 'bg_overlay_opacity', 'bg_music_url',
+            'language', 'timezone',
             'discord_client_id', 'discord_client_secret', 'discord_redirect_uri', 'discord_button_text'
         ]
 
-        for key in settings:
-            set_setting(key, data.get(key, ''))
+        for key in settings_keys:
+            if key in data:
+                set_setting(key, data.get(key, ''))
+
+        # Handle custom background image upload
+        os.makedirs('static/uploads/settings', exist_ok=True)
+        bg_file = request.files.get('custom_bg_image')
+        if bg_file and bg_file.filename:
+            ext = os.path.splitext(secure_filename(bg_file.filename))[1].lower()
+            if ext in {'.png', '.jpg', '.jpeg', '.webp', '.gif'}:
+                fname = f"bg_custom_{int(datetime.now().timestamp())}{ext}"
+                save_path = os.path.join('static/uploads/settings', fname)
+                bg_file.save(save_path)
+                set_setting('bg_image_url', f"/static/uploads/settings/{fname}")
+
+        # Handle custom background music upload
+        music_file = request.files.get('custom_bg_music')
+        if music_file and music_file.filename:
+            ext = os.path.splitext(secure_filename(music_file.filename))[1].lower()
+            if ext in {'.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac'}:
+                fname = f"music_custom_{int(datetime.now().timestamp())}{ext}"
+                save_path = os.path.join('static/uploads/settings', fname)
+                music_file.save(save_path)
+                set_setting('bg_music_url', f"/static/uploads/settings/{fname}")
 
         set_setting('maintenance_mode',
                     '1' if 'maintenance_mode' in data else '0')
@@ -7382,7 +7523,7 @@ def admin_settings():
             current_user.id,
             'success',
             'Settings Updated',
-            'Panel settings have been updated.'
+            'Panel theme, background, music, and system settings have been updated.'
         )
 
         flash('Settings updated successfully', 'success')
@@ -7394,7 +7535,9 @@ def admin_settings():
         'footer_text', 'maintenance_mode', 'maintenance_message',
         'registration_enabled', 'cpu_threshold', 'ram_threshold',
         'default_port_quota', 'max_vps_per_user', 'session_timeout',
-        'backup_enabled', 'backup_retention', 'theme', 'language', 'timezone',
+        'backup_enabled', 'backup_retention', 'theme', 'panel_theme',
+        'bg_image_url', 'bg_overlay_opacity', 'bg_music_url',
+        'language', 'timezone',
         'discord_auth_enabled', 'discord_client_id', 'discord_client_secret',
         'discord_redirect_uri', 'discord_auto_register', 'discord_button_text'
     ]
@@ -7402,10 +7545,22 @@ def admin_settings():
     for key in keys:
         settings[key] = get_setting(key, '')
 
+    if not settings.get('panel_theme'):
+        settings['panel_theme'] = 'obsidian-blue'
+    if not settings.get('bg_image_url'):
+        settings['bg_image_url'] = '/static/img/backgrounds/deep-nebula.png'
+    if not settings.get('bg_overlay_opacity'):
+        settings['bg_overlay_opacity'] = '0.78'
+    if not settings.get('bg_music_url'):
+        settings['bg_music_url'] = '/static/audio/presets/deep-cloud-ambient.wav'
+
     return render_template(
         'admin/settings.html',
         panel_name=get_setting('site_name', 'ZK-VPS-PANEL'),
-        settings=settings
+        settings=settings,
+        panel_themes=PANEL_THEMES,
+        bg_image_presets=BG_IMAGE_PRESETS,
+        bg_music_presets=BG_MUSIC_PRESETS
     )
 
 @app.route('/admin/settings/upload-header-icon', methods=['POST'])

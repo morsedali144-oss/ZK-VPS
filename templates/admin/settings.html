@@ -1,105 +1,261 @@
 {% extends "admin-base.html" %}
 
 {% block title %}Panel Settings · {{ panel_name | default('ZK-VPS-PANEL') }}{% endblock %}
-{% block header_title %}Platform Configuration & Thresholds{% endblock %}
+{% block header_title %}Platform Configuration, Themes & Media Studio{% endblock %}
 
 {% block breadcrumbs %}
 <div class="breadcrumb">
     <a href="{{ url_for('admin_dashboard') }}" class="breadcrumb-item">Admin</a>
     <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
-    <span class="breadcrumb-item active">Settings</span>
+    <span class="breadcrumb-item active">Panel Settings</span>
 </div>
 {% endblock %}
 
 {% block content %}
-<div class="card" style="max-width: 920px; margin: 0 auto;">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-sliders"></i> Global Panel Settings</h3>
+<form method="POST" action="{{ url_for('admin_settings') }}" enctype="multipart/form-data" style="max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.5rem;">
+
+    <!-- 1. Multi-Theme Selector -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3 class="card-title"><i class="fas fa-palette"></i> Panel Theme Engine</h3>
+                <p style="font-size: 0.82rem; color: var(--text-tertiary); margin-top: 0.2rem;">Choose from 6 engineered dark-blue & cyber SaaS color themes. Clicking a card previews the theme immediately.</p>
+            </div>
+            <span class="badge badge-info"><i class="fas fa-wand-magic-sparkles"></i> Live Preview</span>
+        </div>
+
+        {% set current_theme = settings.get('panel_theme', 'obsidian-blue') %}
+        <div class="grid grid-3" style="gap: 1rem;">
+            {% for theme in panel_themes %}
+            {% set key = theme.id %}
+            <label class="theme-option-card {% if current_theme == key %}active{% endif %}" onclick="previewPanelTheme('{{ key }}', this)" style="display: flex; flex-direction: column; gap: 0.65rem; padding: 1rem 1.1rem; border-radius: 14px; background: rgba(6, 13, 26, 0.72); border: 1.5px solid {% if current_theme == key %}var(--cyan-400){% else %}var(--border-subtle){% endif %}; cursor: pointer; transition: var(--transition);">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div style="display: flex; align-items: center; gap: 0.6rem;">
+                        <input type="radio" name="panel_theme" value="{{ key }}" {% if current_theme == key %}checked{% endif %} style="accent-color: var(--cyan-400);">
+                        <span style="font-weight: 700; font-size: 0.92rem; color: var(--text-primary);">{{ theme.name }}</span>
+                    </div>
+                    <div style="display: flex; gap: 0.3rem;">
+                        <span style="width: 16px; height: 16px; border-radius: 50%; background: {{ theme.bg }}; border: 1px solid rgba(255,255,255,0.25);"></span>
+                        <span style="width: 16px; height: 16px; border-radius: 50%; background: {{ theme.primary }};"></span>
+                        <span style="width: 16px; height: 16px; border-radius: 50%; background: {{ theme.accent }};"></span>
+                    </div>
+                </div>
+                <p style="font-size: 0.78rem; color: var(--text-tertiary); line-height: 1.4;">{{ theme.desc }}</p>
+            </label>
+            {% endfor %}
+        </div>
     </div>
 
-    <form method="POST" action="{{ url_for('admin_settings') }}">
-        <div class="grid grid-2">
+    <!-- 2. Background Image Studio (Presets + Upload) -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3 class="card-title"><i class="fas fa-image"></i> Background Wallpaper & Atmosphere</h3>
+                <p style="font-size: 0.82rem; color: var(--text-tertiary); margin-top: 0.2rem;">Select one of the pre-generated HD wallpapers or upload your own custom background image.</p>
+            </div>
+        </div>
+
+        {% set current_bg = settings.get('bg_image_url', '/static/img/backgrounds/deep-nebula.png') %}
+        {% set preset_bg_urls = bg_image_presets | map(attribute='url') | list %}
+
+        <div class="grid grid-3" style="gap: 1rem; margin-bottom: 1.25rem;">
+            {% for preset in bg_image_presets %}
+            <label onclick="previewBgImage('{{ preset.url }}')" style="display: flex; flex-direction: column; gap: 0.55rem; padding: 0.75rem; border-radius: 14px; background: rgba(6, 13, 26, 0.72); border: 1.5px solid {% if current_bg == preset.url %}var(--cyan-400){% else %}var(--border-subtle){% endif %}; cursor: pointer;">
+                {% if preset.url != 'none' %}
+                <div style="height: 88px; border-radius: 9px; background-image: url('{{ preset.url }}'); background-size: cover; background-position: center; border: 1px solid rgba(255,255,255,0.08);"></div>
+                {% else %}
+                <div style="height: 88px; border-radius: 9px; background: radial-gradient(circle at 20% 20%, rgba(37,99,235,0.35), rgba(4,8,18,0.95)); display: flex; align-items: center; justify-content: center; color: var(--text-tertiary); font-size: 0.78rem; border: 1px solid rgba(255,255,255,0.08);">
+                    <i class="fas fa-ban" style="margin-right: 0.4rem;"></i> Pure CSS Gradient Only
+                </div>
+                {% endif %}
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="radio" name="bg_image_url" value="{{ preset.url }}" {% if current_bg == preset.url %}checked{% endif %} style="accent-color: var(--cyan-400);">
+                    <span style="font-size: 0.84rem; font-weight: 600;">{{ preset.name }}</span>
+                </div>
+            </label>
+            {% endfor %}
+
+            {% if current_bg and current_bg not in preset_bg_urls %}
+            <label onclick="previewBgImage('{{ current_bg }}')" style="display: flex; flex-direction: column; gap: 0.55rem; padding: 0.75rem; border-radius: 14px; background: rgba(6, 13, 26, 0.72); border: 1.5px solid var(--cyan-400); cursor: pointer;">
+                <div style="height: 88px; border-radius: 9px; background-image: url('{{ current_bg }}'); background-size: cover; background-position: center; border: 1px solid rgba(255,255,255,0.08);"></div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="radio" name="bg_image_url" value="{{ current_bg }}" checked style="accent-color: var(--cyan-400);">
+                    <span style="font-size: 0.84rem; font-weight: 600;">Custom Uploaded Wallpaper</span>
+                </div>
+            </label>
+            {% endif %}
+        </div>
+
+        <div class="grid grid-2" style="gap: 1.25rem; padding-top: 0.75rem; border-top: 1px solid var(--border-subtle);">
+            <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label"><i class="fas fa-upload"></i> Upload New Background Image (PNG, JPG, WEBP, GIF)</label>
+                <input type="file" name="custom_bg_image" accept=".png,.jpg,.jpeg,.webp,.gif" class="form-control">
+                <div class="form-text">Uploading a file automatically activates it as the panel background wallpaper.</div>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">Background Dark Overlay Opacity (<span id="opacityValLabel">{{ settings.get('bg_overlay_opacity', '0.78') }}</span>)</label>
+                <input type="range" name="bg_overlay_opacity" min="0.35" max="0.95" step="0.02" value="{{ settings.get('bg_overlay_opacity', '0.78') }}" oninput="document.getElementById('opacityValLabel').textContent = this.value" class="form-control" style="padding: 0.45rem 0; accent-color: var(--cyan-400);">
+                <div class="form-text">Higher values darken the wallpaper so glass cards and text stay crisp.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Background Ambient Music Studio (Presets + Upload) -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3 class="card-title"><i class="fas fa-music"></i> Ambient Background Music Studio</h3>
+                <p style="font-size: 0.82rem; color: var(--text-tertiary); margin-top: 0.2rem;">Configure the ambient audio track available in the top navigation bar. Choose a built-in synth track or upload custom audio.</p>
+            </div>
+        </div>
+
+        {% set current_music = settings.get('bg_music_url', '/static/audio/presets/deep-cloud-ambient.wav') %}
+        {% set preset_music_urls = bg_music_presets | map(attribute='url') | list %}
+
+        <div class="grid grid-2" style="gap: 0.9rem; margin-bottom: 1.25rem;">
+            {% for track in bg_music_presets %}
+            <label style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.85rem 1rem; border-radius: 12px; background: rgba(6, 13, 26, 0.72); border: 1.5px solid {% if current_music == track.url %}var(--cyan-400){% else %}var(--border-subtle){% endif %}; cursor: pointer;">
+                <div style="display: flex; align-items: center; gap: 0.65rem;">
+                    <input type="radio" name="bg_music_url" value="{{ track.url }}" {% if current_music == track.url %}checked{% endif %} style="accent-color: var(--cyan-400);">
+                    <div>
+                        <div style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary);">{{ track.name }}</div>
+                        <div style="font-size: 0.74rem; color: var(--text-tertiary);">{{ 'No header music player' if track.url == 'none' else track.url }}</div>
+                    </div>
+                </div>
+                {% if track.url != 'none' %}
+                <button type="button" class="btn btn-xs btn-secondary" onclick="event.preventDefault(); previewSettingsAudio('{{ track.url }}')">
+                    <i class="fas fa-headphones"></i> Preview
+                </button>
+                {% endif %}
+            </label>
+            {% endfor %}
+
+            {% if current_music and current_music not in preset_music_urls %}
+            <label style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.85rem 1rem; border-radius: 12px; background: rgba(6, 13, 26, 0.72); border: 1.5px solid var(--cyan-400); cursor: pointer;">
+                <div style="display: flex; align-items: center; gap: 0.65rem;">
+                    <input type="radio" name="bg_music_url" value="{{ current_music }}" checked style="accent-color: var(--cyan-400);">
+                    <div>
+                        <div style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary);">Custom Uploaded Audio Track</div>
+                        <div style="font-size: 0.74rem; color: var(--text-tertiary);">{{ current_music }}</div>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-xs btn-secondary" onclick="event.preventDefault(); previewSettingsAudio('{{ current_music }}')">
+                    <i class="fas fa-headphones"></i> Preview
+                </button>
+            </label>
+            {% endif %}
+        </div>
+
+        <div class="grid grid-2" style="gap: 1.25rem; align-items: center; padding-top: 0.75rem; border-top: 1px solid var(--border-subtle);">
+            <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label"><i class="fas fa-file-audio"></i> Upload Custom Music Track (MP3, WAV, OGG, M4A)</label>
+                <input type="file" name="custom_bg_music" accept=".mp3,.wav,.ogg,.m4a" class="form-control">
+                <div class="form-text">Uploading an audio file automatically sets it as the active panel background music.</div>
+            </div>
+            <div style="background: rgba(6, 13, 26, 0.65); padding: 0.85rem 1rem; border-radius: 12px; border: 1px solid var(--border-subtle);">
+                <div style="font-size: 0.76rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">
+                    <i class="fas fa-volume-high" style="color: var(--cyan-400);"></i> Audio Track Preview Player
+                </div>
+                <audio id="settingsPreviewAudio" controls style="width: 100%; height: 34px;" src="{{ current_music if current_music != 'none' else '/static/audio/presets/deep-cloud-ambient.wav' }}"></audio>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Core Platform Settings -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-sliders"></i> Core Platform & Security Thresholds</h3>
+        </div>
+
+        <div class="grid grid-3">
             <div class="form-group">
                 <label class="form-label">Panel Brand Name</label>
                 <input type="text" name="site_name" class="form-control" value="{{ settings.get('site_name', 'ZK-VPS-PANEL') }}">
             </div>
             <div class="form-group">
-                <label class="form-label">Footer Brand Text</label>
-                <input type="text" name="footer_text" class="form-control" value="{{ settings.get('footer_text', 'ZK-VPS-PANEL') }}">
+                <label class="form-label">Support Email</label>
+                <input type="email" name="support_email" class="form-control" value="{{ settings.get('support_email', 'support@zk-vps.local') }}">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Default LXD Node</label>
+                <select name="default_node" class="form-select">
+                    <option value="">Local Node</option>
+                    {% for node in nodes %}
+                    <option value="{{ node.id }}" {% if settings.get('default_node') == (node.id|string) %}selected{% endif %}>{{ node.name }} ({{ node.location }})</option>
+                    {% endfor %}
+                </select>
             </div>
         </div>
 
-        <div class="form-group">
-            <label class="form-label">Platform Description</label>
-            <input type="text" name="site_description" class="form-control" value="{{ settings.get('site_description', '') }}">
-        </div>
-
-        <div class="grid grid-2">
+        <div class="grid grid-3">
             <div class="form-group">
-                <label class="form-label">Header Logo Path</label>
-                <input type="text" name="header_icon" class="form-control" value="{{ settings.get('header_icon', '/static/img/logo.png') }}">
+                <label class="form-label">Max Backups Per VPS</label>
+                <input type="number" name="max_backups_per_vps" class="form-control" value="{{ settings.get('max_backups_per_vps', '5') }}">
             </div>
             <div class="form-group">
-                <label class="form-label">Favicon Path</label>
-                <input type="text" name="favicon" class="form-control" value="{{ settings.get('favicon', '/static/img/favicon.ico') }}">
-            </div>
-        </div>
-
-        <div class="grid grid-4">
-            <div class="form-group">
-                <label class="form-label">CPU Auto-Suspend (%)</label>
-                <input type="number" name="cpu_threshold" class="form-control" value="{{ settings.get('cpu_threshold', '90') }}">
+                <label class="form-label">Session Timeout (minutes)</label>
+                <input type="number" name="session_timeout" class="form-control" value="{{ settings.get('session_timeout', '30') }}">
             </div>
             <div class="form-group">
-                <label class="form-label">RAM Auto-Suspend (%)</label>
-                <input type="number" name="ram_threshold" class="form-control" value="{{ settings.get('ram_threshold', '90') }}">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Default Port Quota</label>
-                <input type="number" name="default_port_quota" class="form-control" value="{{ settings.get('default_port_quota', '5') }}">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Max VPS Per User</label>
-                <input type="number" name="max_vps_per_user" class="form-control" value="{{ settings.get('max_vps_per_user', '10') }}">
+                <label class="form-label">Max Login Attempts</label>
+                <input type="number" name="max_login_attempts" class="form-control" value="{{ settings.get('max_login_attempts', '5') }}">
             </div>
         </div>
 
-        <div class="grid grid-2">
-            <div class="form-group">
-                <label class="form-label">Session Timeout (sec)</label>
-                <input type="number" name="session_timeout" class="form-control" value="{{ settings.get('session_timeout', '3600') }}">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Backup Retention (days)</label>
-                <input type="number" name="backup_retention" class="form-control" value="{{ settings.get('backup_retention', '7') }}">
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label class="form-label">Maintenance Banner Message</label>
-            <input type="text" name="maintenance_message" class="form-control" value="{{ settings.get('maintenance_message', 'Site is under maintenance.') }}">
-        </div>
-
-        <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; margin: 1.25rem 0;">
+        <div style="display: flex; gap: 1.75rem; flex-wrap: wrap; margin: 0.75rem 0 1.25rem;">
             <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                <input type="checkbox" name="registration_enabled" {% if settings.get('registration_enabled', '1') == '1' %}checked{% endif %} style="accent-color: var(--blue-500); width: 16px; height: 16px;">
+                <input type="checkbox" name="allow_registration" {% if settings.get('allow_registration', 'false') == 'true' %}checked{% endif %} style="accent-color: var(--blue-500); width: 16px; height: 16px;">
                 <span>Enable Public User Registration</span>
             </label>
             <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                <input type="checkbox" name="maintenance_mode" {% if settings.get('maintenance_mode', '0') == '1' %}checked{% endif %} style="accent-color: var(--blue-500); width: 16px; height: 16px;">
+                <input type="checkbox" name="maintenance_mode" {% if settings.get('maintenance_mode', 'false') == 'true' %}checked{% endif %} style="accent-color: var(--blue-500); width: 16px; height: 16px;">
                 <span>Enable Maintenance Mode</span>
             </label>
             <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                <input type="checkbox" name="backup_enabled" {% if settings.get('backup_enabled', '1') == '1' %}checked{% endif %} style="accent-color: var(--blue-500); width: 16px; height: 16px;">
+                <input type="checkbox" name="enable_api" {% if settings.get('enable_api', 'true') == 'true' %}checked{% endif %} style="accent-color: var(--blue-500); width: 16px; height: 16px;">
+                <span>Enable REST API v1</span>
+            </label>
+            <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                <input type="checkbox" name="enable_backups" {% if settings.get('enable_backups', 'true') == 'true' %}checked{% endif %} style="accent-color: var(--blue-500); width: 16px; height: 16px;">
                 <span>Enable Automated Backups</span>
             </label>
         </div>
 
-        <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
+        <div style="display: flex; justify-content: flex-end;">
             <button type="submit" class="btn btn-primary btn-lg">
-                <i class="fas fa-floppy-disk"></i> Save Platform Settings
+                <i class="fas fa-floppy-disk"></i> Save Theme, Media & Platform Settings
             </button>
         </div>
-    </form>
-</div>
+    </div>
+</form>
+
+<script>
+function previewPanelTheme(themeKey, cardEl) {
+    document.documentElement.setAttribute('data-panel-theme', themeKey);
+    document.querySelectorAll('.theme-option-card').forEach(el => {
+        el.style.borderColor = 'var(--border-subtle)';
+    });
+    if (cardEl) {
+        cardEl.style.borderColor = 'var(--cyan-400)';
+    }
+}
+
+function previewBgImage(url) {
+    const opacity = document.querySelector('input[name="bg_overlay_opacity"]')?.value || '0.78';
+    if (url && url !== 'none') {
+        document.body.style.backgroundImage = `linear-gradient(180deg, rgba(4, 8, 18, ${opacity}) 0%, rgba(4, 8, 18, ${opacity}) 100%), url('${url}')`;
+        document.body.style.backgroundSize = 'cover';
+        document.body.style.backgroundPosition = 'center';
+    } else {
+        document.body.style.backgroundImage = '';
+    }
+}
+
+function previewSettingsAudio(url) {
+    const player = document.getElementById('settingsPreviewAudio');
+    if (!player) return;
+    player.src = url;
+    player.play().catch(() => {});
+}
+</script>
 {% endblock %}

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="dark" data-panel-theme="{{ get_setting('panel_theme', 'obsidian-blue') }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
@@ -72,19 +72,94 @@
             --font-mono: 'JetBrains Mono', monospace;
         }
 
+        :root[data-panel-theme="arctic-cyan"] {
+            --bg-canvas: #020b14;
+            --bg-primary: #051322;
+            --bg-secondary: #071a2c;
+            --bg-tertiary: #0c253d;
+            --card-bg: rgba(7, 26, 44, 0.86);
+            --card-border: rgba(56, 189, 248, 0.20);
+            --blue-400: #38bdf8;
+            --blue-500: #06b6d4;
+            --cyan-400: #67e8f9;
+            --gradient-blue: linear-gradient(135deg, #0891b2 0%, #38bdf8 100%);
+        }
+
+        :root[data-panel-theme="royal-sapphire"] {
+            --bg-canvas: #05061a;
+            --bg-primary: #090b26;
+            --bg-secondary: #101438;
+            --bg-tertiary: #171d4d;
+            --card-bg: rgba(16, 20, 56, 0.86);
+            --card-border: rgba(99, 102, 241, 0.22);
+            --blue-400: #818cf8;
+            --blue-500: #4f46e5;
+            --cyan-400: #60a5fa;
+            --gradient-blue: linear-gradient(135deg, #4f46e5 0%, #2563eb 100%);
+        }
+
+        :root[data-panel-theme="neon-cyber"] {
+            --bg-canvas: #02040a;
+            --bg-primary: #050a14;
+            --bg-secondary: #081224;
+            --bg-tertiary: #0d1d38;
+            --card-bg: rgba(8, 18, 36, 0.88);
+            --card-border: rgba(0, 229, 255, 0.26);
+            --blue-400: #00e5ff;
+            --blue-500: #0066ff;
+            --cyan-400: #00e5ff;
+            --gradient-blue: linear-gradient(135deg, #0052ff 0%, #00e5ff 100%);
+        }
+
+        :root[data-panel-theme="emerald-matrix"] {
+            --bg-canvas: #030e14;
+            --bg-primary: #05161f;
+            --bg-secondary: #08202b;
+            --bg-tertiary: #0d2e3d;
+            --card-bg: rgba(8, 32, 43, 0.86);
+            --card-border: rgba(16, 185, 129, 0.22);
+            --blue-400: #34d399;
+            --blue-500: #0ea5e9;
+            --cyan-400: #10b981;
+            --gradient-blue: linear-gradient(135deg, #0284c7 0%, #10b981 100%);
+        }
+
+        :root[data-panel-theme="crimson-eclipse"] {
+            --bg-canvas: #080514;
+            --bg-primary: #0e0922;
+            --bg-secondary: #150e30;
+            --bg-tertiary: #1f1645;
+            --card-bg: rgba(21, 14, 48, 0.86);
+            --card-border: rgba(139, 92, 246, 0.22);
+            --blue-400: #a78bfa;
+            --blue-500: #6366f1;
+            --cyan-400: #f472b6;
+            --gradient-blue: linear-gradient(135deg, #6366f1 0%, #ec4899 100%);
+        }
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
 
+        {% set active_bg = get_setting('bg_image_url', '/static/img/backgrounds/deep-nebula.png') %}
+        {% set active_opacity = get_setting('bg_overlay_opacity', '0.78') %}
         html, body {
             font-family: var(--font-sans);
             background-color: var(--bg-canvas);
+            {% if active_bg and active_bg != 'none' %}
+            background-image:
+                linear-gradient(180deg, rgba(4, 8, 18, {{ active_opacity }}) 0%, rgba(4, 8, 18, {{ active_opacity }}) 100%),
+                url('{{ active_bg }}');
+            background-size: cover;
+            background-position: center;
+            {% else %}
             background-image:
                 radial-gradient(circle at 12% 0%, rgba(37, 99, 235, 0.16) 0%, transparent 42%),
                 radial-gradient(circle at 88% 12%, rgba(14, 165, 233, 0.11) 0%, transparent 38%),
                 radial-gradient(circle at 50% 100%, rgba(29, 78, 216, 0.12) 0%, transparent 45%);
+            {% endif %}
             background-attachment: fixed;
             color: var(--text-primary);
             line-height: 1.55;
@@ -1435,6 +1510,18 @@
                 </div>
 
                 <div class="header-right">
+                    {% set active_music = get_setting('bg_music_url', '/static/audio/presets/deep-cloud-ambient.wav') %}
+                    {% if active_music and active_music != 'none' %}
+                    <div class="cluster-pill" style="gap: 0.45rem; padding: 0.28rem 0.65rem;">
+                        <button type="button" id="bgMusicToggleBtn" onclick="togglePanelMusic()" style="background: none; border: none; color: var(--cyan-400); cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.76rem; font-weight: 600;">
+                            <i class="fas fa-play" id="bgMusicIcon"></i>
+                            <span id="bgMusicStatus">Ambient Audio</span>
+                        </button>
+                        <input type="range" id="bgMusicVol" min="0" max="1" step="0.05" value="0.35" onchange="setPanelMusicVolume(this.value)" style="width: 54px; accent-color: var(--cyan-400); cursor: pointer;" title="Music Volume">
+                        <audio id="panelBgAudio" src="{{ active_music }}" loop preload="none"></audio>
+                    </div>
+                    {% endif %}
+
                     <div class="cluster-pill">
                         <span class="cluster-pill-dot"></span>
                         <span>{% if DEMO_MODE %}Demo Mode · Frontend Sandbox{% else %}LXD Compute Engine{% endif %}</span>
@@ -1840,6 +1927,54 @@
                 ramEl.textContent = parseFloat(stats.ram.pct || 0).toFixed(1) + '%';
             }
         };
+
+        window.togglePanelMusic = function() {
+            const audio = document.getElementById('panelBgAudio');
+            const icon = document.getElementById('bgMusicIcon');
+            const status = document.getElementById('bgMusicStatus');
+            if (!audio) return;
+            const savedVol = parseFloat(localStorage.getItem('zk_music_vol') || '0.35');
+            audio.volume = isNaN(savedVol) ? 0.35 : savedVol;
+            if (audio.paused) {
+                audio.play().then(() => {
+                    if (icon) icon.className = 'fas fa-pause';
+                    if (status) status.textContent = 'Playing';
+                    localStorage.setItem('zk_music_playing', '1');
+                }).catch(() => {
+                    showToast('Click Play again to start ambient audio', 'info');
+                });
+            } else {
+                audio.pause();
+                if (icon) icon.className = 'fas fa-play';
+                if (status) status.textContent = 'Ambient Audio';
+                localStorage.setItem('zk_music_playing', '0');
+            }
+        };
+
+        window.setPanelMusicVolume = function(val) {
+            const audio = document.getElementById('panelBgAudio');
+            const v = Math.max(0, Math.min(1, parseFloat(val) || 0.35));
+            localStorage.setItem('zk_music_vol', String(v));
+            if (audio) audio.volume = v;
+        };
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const audio = document.getElementById('panelBgAudio');
+            const volInput = document.getElementById('bgMusicVol');
+            if (audio && volInput) {
+                const savedVol = parseFloat(localStorage.getItem('zk_music_vol') || '0.35');
+                volInput.value = isNaN(savedVol) ? 0.35 : savedVol;
+                audio.volume = isNaN(savedVol) ? 0.35 : savedVol;
+                if (localStorage.getItem('zk_music_playing') === '1') {
+                    audio.play().then(() => {
+                        const icon = document.getElementById('bgMusicIcon');
+                        const status = document.getElementById('bgMusicStatus');
+                        if (icon) icon.className = 'fas fa-pause';
+                        if (status) status.textContent = 'Playing';
+                    }).catch(() => {});
+                }
+            }
+        });
     </script>
     {% block extra_js %}{% endblock %}
 </body>
